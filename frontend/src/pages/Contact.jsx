@@ -342,11 +342,11 @@ const Contact = () => {
                 </Button>
               </a>
             </div>
-            <div className="relative">
+            <div className="relative hidden lg:block">
               <img
-                src={BRAND_INFO.mascot}
-                alt="Wheelspa Mascot"
-                className="mx-auto h-80 w-auto drop-shadow-2xl"
+                src="https://images.pexels.com/photos/3764984/pexels-photo-3764984.jpeg"
+                alt="Premium Car"
+                className="rounded-2xl shadow-2xl h-80 w-auto object-cover"
               />
             </div>
           </div>
