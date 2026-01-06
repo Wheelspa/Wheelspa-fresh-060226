@@ -1,0 +1,319 @@
+import React, { useState } from 'react';
+import { BookOpen, Clock, Tag, ChevronDown, ChevronUp, Search, ArrowRight } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
+import Layout from '../components/layout/Layout';
+import { BLOG_POSTS, FAQS, BRAND_INFO } from '../data/mock';
+
+const Knowledge = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const categories = ['All', 'Guides', 'Tips', 'Education', 'FAQ'];
+
+  const filteredPosts = BLOG_POSTS.filter(post => {
+    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = activeCategory === 'All' || post.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const comparisonData = [
+    {
+      feature: 'Protection Level',
+      ppf: 'Physical barrier against scratches, chips',
+      ceramic: 'Chemical protection & hydrophobic',
+      graphene: 'Chemical + heat dissipation'
+    },
+    {
+      feature: 'Durability',
+      ppf: '7-10 years',
+      ceramic: '3-5 years',
+      graphene: '5-7 years'
+    },
+    {
+      feature: 'Self-Healing',
+      ppf: 'Yes (with heat)',
+      ceramic: 'No',
+      graphene: 'No'
+    },
+    {
+      feature: 'Gloss Enhancement',
+      ppf: 'Moderate',
+      ceramic: 'High',
+      graphene: 'Very High'
+    },
+    {
+      feature: 'Heat Resistance',
+      ppf: 'Moderate',
+      ceramic: 'Good',
+      graphene: 'Excellent'
+    },
+    {
+      feature: 'Water Spots',
+      ppf: 'Can occur',
+      ceramic: 'Resistant',
+      graphene: 'Highly Resistant'
+    },
+    {
+      feature: 'Price Range',
+      ppf: 'Higher',
+      ceramic: 'Moderate',
+      graphene: 'Higher'
+    }
+  ];
+
+  return (
+    <Layout>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 bg-gray-900">
+        <div className="absolute inset-0 opacity-20">
+          <img
+            src="https://images.pexels.com/photos/10493497/pexels-photo-10493497.jpeg"
+            alt="Background"
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <span className="inline-block px-4 py-2 bg-green-500/20 text-green-400 rounded-full text-sm font-medium mb-6">
+              Knowledge Center
+            </span>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Car Care
+              <br />
+              <span className="text-green-400">Education Hub</span>
+            </h1>
+            <p className="text-xl text-gray-300">
+              Expert tips, guides, and insights to help you understand and care for your vehicle better.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Search & Filter */}
+      <section className="py-8 bg-white border-b sticky top-20 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                placeholder="Search articles..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <Button
+                  key={category}
+                  variant={activeCategory === category ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveCategory(category)}
+                  className={activeCategory === category ? 'bg-green-500 hover:bg-green-600' : ''}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Blog Posts */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Latest Articles</h2>
+            <p className="text-gray-600">Stay informed with our expert car care insights</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredPosts.map((post) => (
+              <Card key={post.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0">
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={post.image}
+                    alt={post.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <Badge className="bg-green-500 text-white">{post.category}</Badge>
+                  </div>
+                </div>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                    <span className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      {post.readTime}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-green-500 transition-colors line-clamp-2">
+                    {post.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                    {post.excerpt}
+                  </p>
+                  <Button variant="link" className="p-0 text-green-600 hover:text-green-700">
+                    Read More <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Comparison Table */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-green-500 font-medium">Comparison Guide</span>
+            <h2 className="text-3xl font-bold text-gray-900 mt-2 mb-4">
+              PPF vs Ceramic vs Graphene
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Understand the differences between our premium protection options to make an informed decision.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-900 text-white">
+                  <th className="p-4 text-left font-semibold">Feature</th>
+                  <th className="p-4 text-center font-semibold">PPF</th>
+                  <th className="p-4 text-center font-semibold">Ceramic Coating</th>
+                  <th className="p-4 text-center font-semibold">Graphene Coating</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonData.map((row, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                    <td className="p-4 font-medium text-gray-900 border-b">{row.feature}</td>
+                    <td className="p-4 text-center text-gray-600 border-b">{row.ppf}</td>
+                    <td className="p-4 text-center text-gray-600 border-b">{row.ceramic}</td>
+                    <td className="p-4 text-center text-gray-600 border-b">{row.graphene}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-8 text-center">
+            <p className="text-gray-500 text-sm mb-4">
+              Not sure which protection is right for your car? Get a free consultation.
+            </p>
+            <a href={`https://wa.me/91${BRAND_INFO.whatsapp}?text=Hi, I need help choosing the right protection for my car.`}>
+              <Button className="bg-green-500 hover:bg-green-600 text-white">
+                Get Expert Advice
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQs */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-green-500 font-medium">FAQs</span>
+            <h2 className="text-3xl font-bold text-gray-900 mt-2 mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-gray-600">
+              Find answers to common questions about our services and car care.
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="space-y-4">
+            {FAQS.map((faq, index) => (
+              <AccordionItem
+                key={index}
+                value={`item-${index}`}
+                className="bg-white rounded-xl border-0 shadow-sm overflow-hidden"
+              >
+                <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-gray-50 text-left">
+                  <span className="font-semibold text-gray-900">{faq.question}</span>
+                </AccordionTrigger>
+                <AccordionContent className="px-6 pb-4">
+                  <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+
+          <div className="mt-12 text-center">
+            <p className="text-gray-600 mb-4">Still have questions?</p>
+            <a href={`tel:${BRAND_INFO.phones[0].replace(/-/g, '')}`}>
+              <Button variant="outline" className="border-green-500 text-green-600 hover:bg-green-50">
+                Contact Us
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Car Maintenance Tips */}
+      <section className="py-16 bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-green-400 font-medium">Quick Tips</span>
+            <h2 className="text-3xl font-bold text-white mt-2">
+              Essential Car Care Tips
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                title: 'Wash Regularly',
+                tip: 'Wash your car every 2 weeks to prevent dirt buildup and paint damage.',
+                icon: '💧'
+              },
+              {
+                title: 'Park in Shade',
+                tip: 'Protect your car from harsh sun to prevent paint fading and interior damage.',
+                icon: '🌳'
+              },
+              {
+                title: 'Use Quality Products',
+                tip: 'Invest in pH-neutral car shampoos and microfiber towels for safe cleaning.',
+                icon: '✨'
+              },
+              {
+                title: 'Avoid Automatic Washes',
+                tip: 'Brush-based automatic car washes can scratch your paint. Use touchless or hand wash.',
+                icon: '🚫'
+              },
+              {
+                title: 'Dry Properly',
+                tip: 'Always dry your car after washing to prevent water spots, especially on coated surfaces.',
+                icon: '🧽'
+              },
+              {
+                title: 'Interior Care',
+                tip: 'Vacuum regularly and use UV protectant on dashboard to prevent cracking.',
+                icon: '🪑'
+              }
+            ].map((item, index) => (
+              <Card key={index} className="bg-gray-800 border-gray-700">
+                <CardContent className="p-6">
+                  <div className="text-3xl mb-4">{item.icon}</div>
+                  <h3 className="text-lg font-semibold text-white mb-2">{item.title}</h3>
+                  <p className="text-gray-400 text-sm">{item.tip}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+    </Layout>
+  );
+};
+
+export default Knowledge;
