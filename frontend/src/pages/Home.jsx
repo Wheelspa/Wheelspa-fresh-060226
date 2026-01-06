@@ -91,15 +91,6 @@ const Home = () => {
             />
           ))}
         </div>
-
-        {/* Mascot */}
-        <div className="absolute bottom-0 right-10 hidden lg:block z-20">
-          <img
-            src={BRAND_INFO.mascot}
-            alt="Wheelspa Mascot"
-            className="h-80 w-auto drop-shadow-2xl"
-          />
-        </div>
       </section>
 
       {/* Stats Section */}
