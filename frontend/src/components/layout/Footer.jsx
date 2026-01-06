@@ -14,7 +14,7 @@ const Footer = () => {
             <img
               src={BRAND_INFO.logo}
               alt="Wheelspa Logo"
-              className="h-16 w-auto brightness-0 invert"
+              className="h-16 w-auto"
             />
             <p className="text-sm leading-relaxed">
               Premium car care and detailing services in Pune. We pamper your car with
