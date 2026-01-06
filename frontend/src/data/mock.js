@@ -3,8 +3,8 @@
 export const BRAND_INFO = {
   name: "Wheelspa",
   tagline: "Pamper Your Car",
-  logo: "https://customer-assets.emergentagent.com/job_26ac8aff-60d5-403a-af3e-28d9fa3616fc/artifacts/srxv0b83_logo%20new.jpg",
-  mascot: "https://customer-assets.emergentagent.com/job_26ac8aff-60d5-403a-af3e-28d9fa3616fc/artifacts/6zxv1ih9_PHOTO-2025-02-07-16-19-58%202.jpg",
+  logo: "https://customer-assets.emergentagent.com/job_detailing-pro-11/artifacts/gjqt4k8g_logo%20new.png",
+  mascot: "https://customer-assets.emergentagent.com/job_detailing-pro-11/artifacts/g4mul2jq_PHOTO-2025-02-07-16-19-58%202.png",
   phones: ["70226-70226", "777-007-3535"],
   whatsapp: "7770073535",
   email: "info@wheelspa.in",
