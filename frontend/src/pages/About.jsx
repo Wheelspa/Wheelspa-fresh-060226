@@ -56,20 +56,6 @@ const About = () => {
                 What started as a passion for automobiles has evolved into a comprehensive car care facility equipped with cutting-edge technology and staffed by certified professionals. Every vehicle that comes through our doors receives the same meticulous attention to detail, regardless of make or model.
               </p>
             </div>
-            <div className="relative">
-              <img
-                src="https://images.pexels.com/photos/6873123/pexels-photo-6873123.jpeg"
-                alt="Wheelspa Facility"
-                className="rounded-2xl shadow-xl"
-              />
-              <div className="absolute -bottom-6 -right-6 hidden lg:block">
-                <img
-                  src={BRAND_INFO.mascot}
-                  alt="Wheelspa Mascot"
-                  className="h-48 w-auto drop-shadow-xl"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
