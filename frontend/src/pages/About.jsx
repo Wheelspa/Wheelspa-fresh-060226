@@ -56,11 +56,13 @@ const About = () => {
                 What started as a passion for automobiles has evolved into a comprehensive car care facility equipped with cutting-edge technology and staffed by certified professionals. Every vehicle that comes through our doors receives the same meticulous attention to detail, regardless of make or model.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Vision & Mission */}
+            <div className="relative">
+              <img
+                src="https://images.pexels.com/photos/6873123/pexels-photo-6873123.jpeg"
+                alt="Wheelspa Facility"
+                className="rounded-2xl shadow-xl"
+              />
+            </div>
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-8">
