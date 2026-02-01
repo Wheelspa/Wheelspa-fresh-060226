@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
-  Home, ChevronRight, Bell
+  Home, ChevronRight, Bell, Wallet, Users
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -26,7 +26,15 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/reports', label: 'Reports', icon: BarChart3 },
   ];
 
+  const installerNavItems = [
+    { path: '/admin/installer', label: 'Installer Dashboard', icon: Wallet },
+    { path: '/admin/installer/new-payment', label: 'Add Payment', icon: Plus },
+    { path: '/admin/installer/payments', label: 'All Payments', icon: List },
+    { path: '/admin/installer/installers', label: 'Manage Installers', icon: Users },
+  ];
+
   const isActive = (path) => location.pathname === path;
+  const isInstallerSection = location.pathname.startsWith('/admin/installer');
 
   return (
     <div className="min-h-screen bg-gray-100">
