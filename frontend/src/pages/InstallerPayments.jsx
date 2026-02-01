@@ -646,6 +646,34 @@ const InstallerPayments = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Receipt Modal */}
+      <Dialog open={isReceiptModalOpen} onOpenChange={setIsReceiptModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Printer className="h-5 w-5 text-green-500 mr-2" />
+              Payment Receipt
+            </DialogTitle>
+          </DialogHeader>
+          {selectedPayment && (
+            <div className="border rounded-lg overflow-hidden">
+              <InstallerReceipt 
+                ref={receiptRef}
+                payment={selectedPayment} 
+                receiptNo={generateReceiptNumber(selectedPayment)}
+              />
+            </div>
+          )}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsReceiptModalOpen(false)}>Close</Button>
+            <Button onClick={handlePrintReceipt} className="bg-green-500 hover:bg-green-600 text-white">
+              <Printer className="h-4 w-4 mr-2" />
+              Print Receipt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
