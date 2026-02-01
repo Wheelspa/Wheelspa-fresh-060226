@@ -452,13 +452,16 @@ const InstallerPayments = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-center space-x-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewPayment(payment)}>
+                          <Button variant="ghost" size="sm" onClick={() => handleViewPayment(payment)} title="View Details">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleEditClick(payment)}>
+                          <Button variant="ghost" size="sm" onClick={() => handleGenerateReceipt(payment)} title="Generate Receipt" className="text-green-600">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditClick(payment)} title="Edit">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDeleteClick(payment)}>
+                          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDeleteClick(payment)} title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
