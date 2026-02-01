@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
   Home, ChevronRight, Bell
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { useAdminAuth } from '../context/AdminAuthContext';
-import { BRAND_INFO } from '../data/mock';
+import { Button } from '../ui/button';
+import { useAdminAuth } from '../../context/AdminAuthContext';
+import { BRAND_INFO } from '../../data/mock';
 
 const AdminLayout = ({ children, title }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
