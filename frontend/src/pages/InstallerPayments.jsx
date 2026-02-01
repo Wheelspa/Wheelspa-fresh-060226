@@ -37,7 +37,9 @@ const InstallerPayments = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState(null);
+  const receiptRef = useRef(null);
   
   const [editForm, setEditForm] = useState({
     advancePaid: '',
