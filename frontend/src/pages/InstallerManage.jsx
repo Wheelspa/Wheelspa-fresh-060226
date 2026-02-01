@@ -138,18 +138,24 @@ const InstallerManage = () => {
   };
 
   const handleDeleteConfirm = () => {
-    const hasPayments = payments.some(p => p.installerId === selectedInstaller.id);
-    if (hasPayments) {
-      toast.error('Cannot delete installer with existing payments');
-      setIsDeleteModalOpen(false);
-      return;
-    }
-
+    // Delete installer
     const updatedInstallers = installers.filter(i => i.id !== selectedInstaller.id);
     localStorage.setItem('wheelspa_installers', JSON.stringify(updatedInstallers));
     setInstallers(updatedInstallers);
+
+    // If deleteWithPayments is checked, also delete associated payments
+    if (deleteWithPayments && installerPaymentCount > 0) {
+      const updatedPayments = payments.filter(p => p.installerId !== selectedInstaller.id);
+      localStorage.setItem('wheelspa_installer_payments', JSON.stringify(updatedPayments));
+      setPayments(updatedPayments);
+      toast.success(`Installer and ${installerPaymentCount} payment(s) deleted successfully`);
+    } else {
+      toast.success('Installer deleted successfully');
+    }
+
     setIsDeleteModalOpen(false);
-    toast.success('Installer deleted successfully');
+    setSelectedInstaller(null);
+    setDeleteWithPayments(false);
   };
 
   return (
