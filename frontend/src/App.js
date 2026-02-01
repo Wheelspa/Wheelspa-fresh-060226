@@ -19,6 +19,12 @@ import AdminNewEntry from "./pages/AdminNewEntry";
 import AdminEntries from "./pages/AdminEntries";
 import AdminReports from "./pages/AdminReports";
 
+// Installer Payment Pages
+import InstallerDashboard from "./pages/InstallerDashboard";
+import InstallerNewPayment from "./pages/InstallerNewPayment";
+import InstallerPayments from "./pages/InstallerPayments";
+import InstallerManage from "./pages/InstallerManage";
+
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAdminAuth();
@@ -77,6 +83,39 @@ const AdminRoutes = () => {
         element={
           <ProtectedRoute>
             <AdminReports />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Installer Payment Routes */}
+      <Route 
+        path="/installer" 
+        element={
+          <ProtectedRoute>
+            <InstallerDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/installer/new-payment" 
+        element={
+          <ProtectedRoute>
+            <InstallerNewPayment />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/installer/payments" 
+        element={
+          <ProtectedRoute>
+            <InstallerPayments />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/installer/installers" 
+        element={
+          <ProtectedRoute>
+            <InstallerManage />
           </ProtectedRoute>
         } 
       />
