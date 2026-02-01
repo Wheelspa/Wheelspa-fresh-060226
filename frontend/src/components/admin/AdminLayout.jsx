@@ -70,7 +70,9 @@ const AdminLayout = ({ children, title }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+            {/* Vehicle Entries Section */}
+            <p className="text-xs text-gray-500 uppercase tracking-wider px-4 mb-2">Vehicle Entries</p>
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -86,6 +88,26 @@ const AdminLayout = ({ children, title }) => {
                 <span>{item.label}</span>
               </Link>
             ))}
+
+            {/* Installer Payments Section */}
+            <div className="pt-4 mt-4 border-t border-gray-800">
+              <p className="text-xs text-gray-500 uppercase tracking-wider px-4 mb-2">Installer Payments</p>
+              {installerNavItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                    isActive(item.path)
+                      ? 'bg-green-500 text-white'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-sm">{item.label}</span>
+                </Link>
+              ))}
+            </div>
           </nav>
 
           {/* User Info & Logout */}
