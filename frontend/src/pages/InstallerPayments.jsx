@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Search, Filter, Plus, Edit, Trash2, Eye, Calendar,
-  Download, RefreshCw, IndianRupee, FileText, X
+  Download, RefreshCw, IndianRupee, FileText, X, Printer
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import AdminLayout from '../components/admin/AdminLayout';
+import InstallerReceipt from '../components/InstallerReceipt';
 import { 
   MOCK_INSTALLER_PAYMENTS, 
   INSTALLER_CATEGORIES, 
