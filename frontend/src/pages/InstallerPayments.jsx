@@ -112,6 +112,104 @@ const InstallerPayments = () => {
     setIsViewModalOpen(true);
   };
 
+  const handleGenerateReceipt = (payment) => {
+    setSelectedPayment(payment);
+    setIsReceiptModalOpen(true);
+  };
+
+  const handlePrintReceipt = () => {
+    const printContent = receiptRef.current;
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment Receipt - ${selectedPayment?.jobReference}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .receipt { max-width: 800px; margin: 0 auto; }
+            table { width: 100%; border-collapse: collapse; }
+            td { padding: 12px 0; }
+            .border-b { border-bottom: 1px solid #e5e7eb; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .font-semibold { font-weight: 600; }
+            .font-bold { font-weight: 700; }
+            .text-sm { font-size: 14px; }
+            .text-xs { font-size: 12px; }
+            .text-lg { font-size: 18px; }
+            .text-2xl { font-size: 24px; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-600 { color: #4b5563; }
+            .text-gray-800 { color: #1f2937; }
+            .text-green-600 { color: #16a34a; }
+            .text-orange-600 { color: #ea580c; }
+            .bg-gray-50 { background-color: #f9fafb; }
+            .bg-green-100 { background-color: #dcfce7; }
+            .bg-orange-100 { background-color: #ffedd5; }
+            .text-green-800 { color: #166534; }
+            .text-orange-800 { color: #9a3412; }
+            .rounded { border-radius: 4px; }
+            .rounded-lg { border-radius: 8px; }
+            .rounded-full { border-radius: 9999px; }
+            .p-3 { padding: 12px; }
+            .p-4 { padding: 16px; }
+            .p-8 { padding: 32px; }
+            .px-6 { padding-left: 24px; padding-right: 24px; }
+            .py-2 { padding-top: 8px; padding-bottom: 8px; }
+            .mb-2 { margin-bottom: 8px; }
+            .mb-3 { margin-bottom: 12px; }
+            .mb-6 { margin-bottom: 24px; }
+            .mb-8 { margin-bottom: 32px; }
+            .mt-2 { margin-top: 8px; }
+            .mt-8 { margin-top: 32px; }
+            .mt-12 { margin-top: 48px; }
+            .pt-4 { padding-top: 16px; }
+            .pt-8 { padding-top: 32px; }
+            .pb-2 { padding-bottom: 8px; }
+            .pb-4 { padding-bottom: 16px; }
+            .border-t { border-top: 1px solid #e5e7eb; }
+            .border-b-2 { border-bottom: 2px solid #22c55e; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+            .gap-4 { gap: 16px; }
+            .gap-8 { gap: 32px; }
+            .flex { display: flex; }
+            .justify-between { justify-content: space-between; }
+            .items-start { align-items: flex-start; }
+            .inline-block { display: inline-block; }
+            .h-16 { height: 64px; }
+            .border-gray-400 { border-color: #9ca3af; }
+            img { max-height: 64px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            ${printContent.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const generateReceiptNumber = (payment) => {
+    const date = new Date(payment.createdAt);
+    return `WS-INS-${format(date, 'yyyyMMdd')}-${payment.id.slice(-4)}`;
+  };
+
   const handleEditClick = (payment) => {
     setSelectedPayment(payment);
     setEditForm({
