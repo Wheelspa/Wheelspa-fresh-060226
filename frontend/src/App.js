@@ -1,7 +1,8 @@
 import React from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
+import { AdminAuthProvider, useAdminAuth } from "./context/AdminAuthContext";
 
 // Pages
 import Home from "./pages/Home";
@@ -11,18 +12,96 @@ import Booking from "./pages/Booking";
 import Knowledge from "./pages/Knowledge";
 import Contact from "./pages/Contact";
 
+// Admin Pages
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminNewEntry from "./pages/AdminNewEntry";
+import AdminEntries from "./pages/AdminEntries";
+import AdminReports from "./pages/AdminReports";
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAdminAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/admin" replace />;
+  }
+  
+  return children;
+};
+
+// Admin Route Wrapper
+const AdminRoutes = () => {
+  const { isAuthenticated } = useAdminAuth();
+  
+  return (
+    <Routes>
+      <Route 
+        path="/" 
+        element={isAuthenticated ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />} 
+      />
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/new-entry" 
+        element={
+          <ProtectedRoute>
+            <AdminNewEntry />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/entries" 
+        element={
+          <ProtectedRoute>
+            <AdminEntries />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/reports" 
+        element={
+          <ProtectedRoute>
+            <AdminReports />
+          </ProtectedRoute>
+        } 
+      />
+    </Routes>
+  );
+};
+
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/booking" element={<Booking />} />
-          <Route path="/knowledge" element={<Knowledge />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
+        <AdminAuthProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/booking" element={<Booking />} />
+            <Route path="/knowledge" element={<Knowledge />} />
+            <Route path="/contact" element={<Contact />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminRoutes />} />
+          </Routes>
+        </AdminAuthProvider>
       </BrowserRouter>
       <Toaster position="top-right" />
     </div>
