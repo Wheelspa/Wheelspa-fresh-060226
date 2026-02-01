@@ -24,6 +24,8 @@ const InstallerManage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedInstaller, setSelectedInstaller] = useState(null);
+  const [deleteWithPayments, setDeleteWithPayments] = useState(false);
+  const [installerPaymentCount, setInstallerPaymentCount] = useState(0);
   
   const [formData, setFormData] = useState({
     name: '',
