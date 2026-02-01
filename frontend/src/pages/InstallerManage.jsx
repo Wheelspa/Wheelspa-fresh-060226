@@ -93,6 +93,9 @@ const InstallerManage = () => {
 
   const handleDeleteClick = (installer) => {
     setSelectedInstaller(installer);
+    const paymentCount = payments.filter(p => p.installerId === installer.id).length;
+    setInstallerPaymentCount(paymentCount);
+    setDeleteWithPayments(false);
     setIsDeleteModalOpen(true);
   };
 
