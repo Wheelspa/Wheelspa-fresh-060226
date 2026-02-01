@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Shield, Sparkles, Droplets, Car, Lightbulb, Cog, CheckCircle, ArrowRight, Armchair, Atom } from 'lucide-react';
+import { Shield, Sparkles, Droplets, Car, Lightbulb, Cog, CheckCircle, ArrowRight, Sofa, Atom } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -14,7 +14,7 @@ const iconMap = {
   Car: Car,
   Lightbulb: Lightbulb,
   Cog: Cog,
-  Armchair: Armchair,
+  Armchair: Sofa,
   Atom: Atom,
 };
 
