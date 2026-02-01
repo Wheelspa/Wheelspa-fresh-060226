@@ -555,8 +555,18 @@ const InstallerPayments = () => {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+            <Button 
+              onClick={() => {
+                setIsViewModalOpen(false);
+                handleGenerateReceipt(selectedPayment);
+              }} 
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Generate Receipt
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
