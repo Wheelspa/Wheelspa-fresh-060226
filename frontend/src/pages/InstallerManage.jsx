@@ -356,13 +356,36 @@ const InstallerManage = () => {
           <DialogHeader>
             <DialogTitle className="text-red-600">Delete Installer</DialogTitle>
           </DialogHeader>
-          <p className="text-gray-600">
-            Are you sure you want to delete <strong>{selectedInstaller?.name}</strong>?
-            This action cannot be undone.
-          </p>
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Are you sure you want to delete <strong>{selectedInstaller?.name}</strong>?
+              This action cannot be undone.
+            </p>
+            
+            {installerPaymentCount > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <p className="text-orange-800 font-medium mb-2">
+                  ⚠️ This installer has {installerPaymentCount} payment record(s)
+                </p>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deleteWithPayments}
+                    onChange={(e) => setDeleteWithPayments(e.target.checked)}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="text-sm text-orange-700">
+                    Also delete all payment records for this installer
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
-            <Button className="bg-red-500 hover:bg-red-600 text-white" onClick={handleDeleteConfirm}>Delete</Button>
+            <Button className="bg-red-500 hover:bg-red-600 text-white" onClick={handleDeleteConfirm}>
+              {deleteWithPayments ? 'Delete All' : 'Delete Installer'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
