@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Shield, Sparkles, Droplets, Car, Lightbulb, Cog, CheckCircle, ArrowRight, Sofa, Atom } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import Layout from '../components/layout/Layout';
-import { SERVICES, BRAND_INFO } from '../data/mock';
+import { SERVICES as DEFAULT_SERVICES, BRAND_INFO } from '../data/mock';
 
 const iconMap = {
   Shield: Shield,
@@ -15,11 +15,19 @@ const iconMap = {
   Lightbulb: Lightbulb,
   Cog: Cog,
   Armchair: Sofa,
+  Sofa: Sofa,
   Atom: Atom,
 };
 
 const Services = () => {
   const location = useLocation();
+  const [services, setServices] = useState([]);
+
+  useEffect(() => {
+    // Load services from localStorage or use defaults
+    const storedServices = localStorage.getItem('wheelspa_services');
+    setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+  }, []);
 
   useEffect(() => {
     if (location.hash) {
