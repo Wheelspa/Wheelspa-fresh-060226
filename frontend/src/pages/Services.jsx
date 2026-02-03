@@ -72,8 +72,8 @@ const Services = () => {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {SERVICES.map((service) => {
-              const Icon = iconMap[service.icon];
+            {services.map((service) => {
+              const Icon = iconMap[service.icon] || Shield;
               return (
                 <a
                   key={service.id}
