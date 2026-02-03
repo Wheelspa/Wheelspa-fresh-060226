@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
-  Home, ChevronRight, Bell, Wallet, Users
+  Home, ChevronRight, Bell, Wallet, Users, Settings
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -24,6 +24,7 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/new-entry', label: 'New Entry', icon: Plus },
     { path: '/admin/entries', label: 'All Entries', icon: List },
     { path: '/admin/reports', label: 'Reports', icon: BarChart3 },
+    { path: '/admin/services', label: 'Manage Services', icon: Settings },
   ];
 
   const installerNavItems = [
