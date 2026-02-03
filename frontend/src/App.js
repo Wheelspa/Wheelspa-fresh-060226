@@ -18,6 +18,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminNewEntry from "./pages/AdminNewEntry";
 import AdminEntries from "./pages/AdminEntries";
 import AdminReports from "./pages/AdminReports";
+import AdminServices from "./pages/AdminServices";
 
 // Installer Payment Pages
 import InstallerDashboard from "./pages/InstallerDashboard";
