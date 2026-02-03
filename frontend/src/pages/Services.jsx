@@ -97,8 +97,8 @@ const Services = () => {
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="space-y-24">
-            {SERVICES.map((service, index) => {
-              const Icon = iconMap[service.icon];
+            {services.map((service, index) => {
+              const Icon = iconMap[service.icon] || Shield;
               const isEven = index % 2 === 0;
 
               return (
