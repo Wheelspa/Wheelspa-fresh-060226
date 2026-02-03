@@ -87,6 +87,14 @@ const AdminRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/services" 
+        element={
+          <ProtectedRoute>
+            <AdminServices />
+          </ProtectedRoute>
+        } 
+      />
       {/* Installer Payment Routes */}
       <Route 
         path="/installer" 
