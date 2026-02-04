@@ -139,6 +139,24 @@ const AdminRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      {/* User Management (Owner only) */}
+      <Route 
+        path="/users" 
+        element={
+          <ProtectedRoute>
+            <AdminUsers />
+          </ProtectedRoute>
+        } 
+      />
+      {/* Approval Requests (Superadmin & Owner) */}
+      <Route 
+        path="/approvals" 
+        element={
+          <ProtectedRoute>
+            <AdminApprovals />
+          </ProtectedRoute>
+        } 
+      />
     </Routes>
   );
 };
