@@ -421,6 +421,75 @@ Visit Wheelspa for professional maintenance washes that keep your coating in top
           </div>
         </div>
       </section>
+
+      {/* Article Detail Dialog */}
+      <Dialog open={articleDialogOpen} onOpenChange={setArticleDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedArticle && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-green-500 text-white">{selectedArticle.category}</Badge>
+                  <span className="text-sm text-gray-500 flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {selectedArticle.readTime}
+                  </span>
+                </div>
+                <DialogTitle className="text-2xl font-bold text-gray-900">
+                  {selectedArticle.title}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="mt-4">
+                <img
+                  src={selectedArticle.image}
+                  alt={selectedArticle.title}
+                  className="w-full h-64 object-cover rounded-lg mb-6"
+                />
+                <div className="prose prose-green max-w-none">
+                  {(articleContent[selectedArticle.id] || selectedArticle.excerpt).split('\n\n').map((paragraph, idx) => {
+                    if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                      return (
+                        <h3 key={idx} className="text-lg font-semibold text-gray-900 mt-6 mb-3">
+                          {paragraph.replace(/\*\*/g, '')}
+                        </h3>
+                      );
+                    }
+                    if (paragraph.startsWith('•')) {
+                      return (
+                        <ul key={idx} className="list-disc list-inside space-y-1 text-gray-600 mb-4">
+                          {paragraph.split('\n').map((item, i) => (
+                            <li key={i}>{item.replace('• ', '')}</li>
+                          ))}
+                        </ul>
+                      );
+                    }
+                    return (
+                      <p key={idx} className="text-gray-600 leading-relaxed mb-4">
+                        {paragraph.split('**').map((part, i) => 
+                          i % 2 === 1 ? <strong key={i} className="text-gray-900">{part}</strong> : part
+                        )}
+                      </p>
+                    );
+                  })}
+                </div>
+                <div className="mt-8 pt-6 border-t">
+                  <p className="text-gray-600 mb-4">Have questions? Get expert advice from our team.</p>
+                  <div className="flex gap-3">
+                    <a href={`https://wa.me/91${BRAND_INFO.whatsapp}?text=Hi, I read your article "${selectedArticle.title}" and have some questions.`}>
+                      <Button className="bg-green-500 hover:bg-green-600 text-white">
+                        Chat on WhatsApp
+                      </Button>
+                    </a>
+                    <Button variant="outline" onClick={() => setArticleDialogOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
