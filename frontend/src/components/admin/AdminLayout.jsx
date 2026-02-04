@@ -238,7 +238,7 @@ const AdminLayout = ({ children, title }) => {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              {canApproveRequests() && pendingApprovals > 0 && (
+              {showApprovals && pendingApprovals > 0 && (
                 <Link to="/admin/approvals">
                   <button className="p-2 rounded-lg hover:bg-gray-100 relative">
                     <Bell className="h-5 w-5 text-gray-500" />
