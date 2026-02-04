@@ -20,6 +20,8 @@ import AdminEntries from "./pages/AdminEntries";
 import AdminReports from "./pages/AdminReports";
 import AdminServices from "./pages/AdminServices";
 import AdminBookings from "./pages/AdminBookings";
+import AdminUsers from "./pages/AdminUsers";
+import AdminApprovals from "./pages/AdminApprovals";
 
 // Installer Payment Pages
 import InstallerDashboard from "./pages/InstallerDashboard";
