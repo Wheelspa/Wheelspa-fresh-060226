@@ -69,6 +69,16 @@ Build a premium 6-page car detailing website named "Wheelspa" with:
    - Added article detail dialog with full content
    - Articles now display in a modal when clicked
 
+### New Features Implemented
+5. **3-Tier Authentication System** - COMPLETE
+   - **Owner** (owner/owner123): Full access, can manage all users
+   - **Superadmin**: Can approve/reject admin edit requests
+   - **Admin**: Needs approval from superadmin to edit/delete data
+   - JWT-based authentication with MongoDB storage
+   - Role-based sidebar navigation
+   - User management page (owner only)
+   - Approval requests page (superadmin & owner)
+
 ## Prioritized Backlog
 
 ### P0 - Critical
