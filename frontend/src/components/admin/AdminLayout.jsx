@@ -2,21 +2,39 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
-  Home, ChevronRight, Bell, Wallet, Users, Settings, CalendarCheck
+  Home, ChevronRight, Bell, Wallet, Users, Settings, CalendarCheck,
+  Crown, Shield, UserCog, ClipboardCheck, UserPlus
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { BRAND_INFO } from '../../data/mock';
 
 const AdminLayout = ({ children, title }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { admin, logout } = useAdminAuth();
+  const { admin, logout, pendingApprovals, canApproveRequests, canManageUsers } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/admin');
+  };
+
+  const getRoleIcon = () => {
+    switch (admin?.role) {
+      case 'owner': return <Crown className="h-4 w-4 text-yellow-400" />;
+      case 'superadmin': return <Shield className="h-4 w-4 text-blue-400" />;
+      default: return <UserCog className="h-4 w-4 text-green-400" />;
+    }
+  };
+
+  const getRoleBadgeColor = () => {
+    switch (admin?.role) {
+      case 'owner': return 'bg-yellow-500/20 text-yellow-400';
+      case 'superadmin': return 'bg-blue-500/20 text-blue-400';
+      default: return 'bg-green-500/20 text-green-400';
+    }
   };
 
   const navItems = [
@@ -35,8 +53,16 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/installer/installers', label: 'Manage Installers', icon: Users },
   ];
 
+  // Role-specific nav items
+  const approvalNavItem = canApproveRequests() ? [
+    { path: '/admin/approvals', label: 'Approval Requests', icon: ClipboardCheck, badge: pendingApprovals }
+  ] : [];
+
+  const userManagementNavItem = canManageUsers() ? [
+    { path: '/admin/users', label: 'Manage Users', icon: UserPlus }
+  ] : [];
+
   const isActive = (path) => location.pathname === path;
-  const isInstallerSection = location.pathname.startsWith('/admin/installer');
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -110,6 +136,54 @@ const AdminLayout = ({ children, title }) => {
                 </Link>
               ))}
             </div>
+
+            {/* Administration Section (Role-based) */}
+            {(canApproveRequests() || canManageUsers()) && (
+              <div className="pt-4 mt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 uppercase tracking-wider px-4 mb-2">Administration</p>
+                
+                {/* Approval Requests */}
+                {approvalNavItem.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-green-500 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <item.icon className="h-5 w-5" />
+                      <span className="text-sm">{item.label}</span>
+                    </div>
+                    {item.badge > 0 && (
+                      <Badge className="bg-red-500 text-white text-xs px-2">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                ))}
+
+                {/* User Management */}
+                {userManagementNavItem.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-green-500 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="text-sm">{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </nav>
 
           {/* User Info & Logout */}
@@ -117,12 +191,15 @@ const AdminLayout = ({ children, title }) => {
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-semibold">
-                  {admin?.adminId?.charAt(0).toUpperCase() || 'A'}
+                  {admin?.name?.charAt(0).toUpperCase() || admin?.username?.charAt(0).toUpperCase() || 'A'}
                 </span>
               </div>
-              <div>
-                <p className="text-white font-medium">{admin?.adminId || 'Admin'}</p>
-                <p className="text-xs text-gray-500">Administrator</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium truncate">{admin?.name || admin?.username || 'Admin'}</p>
+                <div className={`inline-flex items-center space-x-1 text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor()}`}>
+                  {getRoleIcon()}
+                  <span className="capitalize">{admin?.role || 'admin'}</span>
+                </div>
               </div>
             </div>
             <Button
@@ -157,10 +234,16 @@ const AdminLayout = ({ children, title }) => {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <button className="p-2 rounded-lg hover:bg-gray-100 relative">
-                <Bell className="h-5 w-5 text-gray-500" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              {canApproveRequests() && pendingApprovals > 0 && (
+                <Link to="/admin/approvals">
+                  <button className="p-2 rounded-lg hover:bg-gray-100 relative">
+                    <Bell className="h-5 w-5 text-gray-500" />
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                      {pendingApprovals}
+                    </span>
+                  </button>
+                </Link>
+              )}
               <Link to="/" target="_blank">
                 <Button variant="outline" size="sm" className="hidden sm:flex">
                   View Website
