@@ -17,6 +17,8 @@ import { BLOG_POSTS, FAQS, BRAND_INFO } from '../data/mock';
 const Knowledge = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [articleDialogOpen, setArticleDialogOpen] = useState(false);
 
   const categories = ['All', 'Guides', 'Tips', 'Education', 'FAQ'];
 
