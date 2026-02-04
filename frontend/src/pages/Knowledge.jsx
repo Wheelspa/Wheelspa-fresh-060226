@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
-import { BookOpen, Clock, Tag, ChevronDown, ChevronUp, Search, ArrowRight } from 'lucide-react';
+import { BookOpen, Clock, Tag, ChevronDown, ChevronUp, Search, ArrowRight, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import Layout from '../components/layout/Layout';
 import { BLOG_POSTS, FAQS, BRAND_INFO } from '../data/mock';
 
