@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Car, User, Phone, Mail, CheckCircle, MapPin, MessageCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,10 +9,11 @@ import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import Layout from '../components/layout/Layout';
-import { SERVICES, CAR_BRANDS, BRAND_INFO } from '../data/mock';
+import { SERVICES as DEFAULT_SERVICES, CAR_BRANDS, BRAND_INFO } from '../data/mock';
 import { format } from 'date-fns';
 
 const Booking = () => {
+  const [services, setServices] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -26,7 +27,14 @@ const Booking = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [bookingId, setBookingId] = useState('');
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    // Load services from localStorage
+    const storedServices = localStorage.getItem('wheelspa_services');
+    setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+  }, []);
 
   const timeSlots = [
     '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
