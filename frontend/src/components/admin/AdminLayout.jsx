@@ -54,15 +54,19 @@ const AdminLayout = ({ children, title }) => {
   ];
 
   // Role-specific nav items
-  const approvalNavItem = canApproveRequests() ? [
+  const showApprovals = admin && (admin.role === 'superadmin' || admin.role === 'owner');
+  const showUserManagement = admin && admin.role === 'owner';
+
+  const approvalNavItem = showApprovals ? [
     { path: '/admin/approvals', label: 'Approval Requests', icon: ClipboardCheck, badge: pendingApprovals }
   ] : [];
 
-  const userManagementNavItem = canManageUsers() ? [
+  const userManagementNavItem = showUserManagement ? [
     { path: '/admin/users', label: 'Manage Users', icon: UserPlus }
   ] : [];
 
   const isActive = (path) => location.pathname === path;
+  const showAdminSection = showApprovals || showUserManagement;
 
   return (
     <div className="min-h-screen bg-gray-100">
