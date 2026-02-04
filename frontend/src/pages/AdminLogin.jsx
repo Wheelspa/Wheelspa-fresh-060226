@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, Car, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, Car, Eye, EyeOff, Shield, Crown, UserCog } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,7 +9,7 @@ import { useAdminAuth } from '../context/AdminAuthContext';
 import { BRAND_INFO } from '../data/mock';
 
 const AdminLogin = () => {
-  const [adminId, setAdminId] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -22,16 +22,21 @@ const AdminLogin = () => {
     setError('');
     setIsLoading(true);
 
-    // Simulate loading
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const result = login(adminId, password);
+    const result = await login(username, password);
     if (result.success) {
       navigate('/admin/dashboard');
     } else {
       setError(result.error);
     }
     setIsLoading(false);
+  };
+
+  const getRoleIcon = (role) => {
+    switch (role) {
+      case 'owner': return <Crown className="h-4 w-4" />;
+      case 'superadmin': return <Shield className="h-4 w-4" />;
+      default: return <UserCog className="h-4 w-4" />;
+    }
   };
 
   return (
@@ -64,16 +69,17 @@ const AdminLogin = () => {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="adminId">Admin ID</Label>
+                <Label htmlFor="username">Username</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    id="adminId"
-                    value={adminId}
-                    onChange={(e) => setAdminId(e.target.value)}
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="pl-10"
-                    placeholder="Enter Admin ID"
+                    placeholder="Enter Username"
                     required
+                    data-testid="login-username"
                   />
                 </div>
               </div>
@@ -90,6 +96,7 @@ const AdminLogin = () => {
                     className="pl-10 pr-10"
                     placeholder="Enter Password"
                     required
+                    data-testid="login-password"
                   />
                   <button
                     type="button"
@@ -105,12 +112,35 @@ const AdminLogin = () => {
                 type="submit"
                 className="w-full bg-green-500 hover:bg-green-600 text-white"
                 disabled={isLoading}
+                data-testid="login-submit"
               >
                 {isLoading ? 'Logging in...' : 'Login'}
               </Button>
             </form>
 
-            <div className="mt-6 pt-4 border-t text-center">
+            {/* Role Information */}
+            <div className="mt-6 pt-4 border-t">
+              <p className="text-xs text-gray-500 text-center mb-3">Access Levels</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="flex flex-col items-center p-2 bg-gray-50 rounded-lg">
+                  <Crown className="h-4 w-4 text-yellow-500 mb-1" />
+                  <span className="font-medium text-gray-700">Owner</span>
+                  <span className="text-gray-400">Full Access</span>
+                </div>
+                <div className="flex flex-col items-center p-2 bg-gray-50 rounded-lg">
+                  <Shield className="h-4 w-4 text-blue-500 mb-1" />
+                  <span className="font-medium text-gray-700">Superadmin</span>
+                  <span className="text-gray-400">Approve</span>
+                </div>
+                <div className="flex flex-col items-center p-2 bg-gray-50 rounded-lg">
+                  <UserCog className="h-4 w-4 text-green-500 mb-1" />
+                  <span className="font-medium text-gray-700">Admin</span>
+                  <span className="text-gray-400">Request</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t text-center">
               <div className="flex items-center justify-center space-x-2 text-gray-500 text-sm">
                 <Car className="h-4 w-4" />
                 <span>Wheelspa Admin System</span>
