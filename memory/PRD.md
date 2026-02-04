@@ -131,9 +131,10 @@ Build a premium 6-page car detailing website named "Wheelspa" with:
 - `/app/frontend/src/components/admin/AdminLayout.jsx` - Admin sidebar
 
 ## Test Credentials
-- **Admin URL:** `/admin`
-- **Admin ID:** `admin`
-- **Password:** `wheelspa@123`
+- **Owner:** username: `owner` / password: `owner123` (Full access + User management)
+- **Superadmin:** Create via Owner panel (Can approve requests)
+- **Admin:** username: `testadmin` / password: `admin123` (Needs approval to edit)
 
 ## Test Reports
-- `/app/test_reports/iteration_1.json` - All tests passed (100%)
+- `/app/test_reports/iteration_1.json` - Bug fixes verified (100%)
+- `/app/test_reports/iteration_2.json` - 3-tier auth system verified (100%)
