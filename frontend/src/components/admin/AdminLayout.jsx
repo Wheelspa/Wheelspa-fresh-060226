@@ -142,7 +142,7 @@ const AdminLayout = ({ children, title }) => {
             </div>
 
             {/* Administration Section (Role-based) */}
-            {(canApproveRequests() || canManageUsers()) && (
+            {showAdminSection && (
               <div className="pt-4 mt-4 border-t border-gray-800">
                 <p className="text-xs text-gray-500 uppercase tracking-wider px-4 mb-2">Administration</p>
                 
