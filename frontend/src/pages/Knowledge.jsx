@@ -29,6 +29,102 @@ const Knowledge = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Article content for the detail view
+  const articleContent = {
+    1: `Understanding the key differences between Paint Protection Film and Ceramic Coating is crucial for making the right choice for your vehicle.
+
+**Paint Protection Film (PPF)**
+PPF is a transparent, self-healing film that provides physical protection against stone chips, scratches, and road debris. It's ideal for high-impact areas like the front bumper, hood, and side mirrors.
+
+Key Benefits:
+• Self-healing technology repairs minor scratches with heat
+• Physical barrier against stone chips and debris
+• 7-10 years of protection
+• Invisible when properly installed
+
+**Ceramic Coating**
+Ceramic coating is a liquid polymer that chemically bonds to your car's paint, creating a hydrophobic surface that repels water and contaminants.
+
+Key Benefits:
+• Enhanced gloss and shine
+• Hydrophobic properties make cleaning easier
+• Protection against UV rays and oxidation
+• 3-5 years of protection
+
+**Which One Should You Choose?**
+For maximum protection, many car enthusiasts opt for both - PPF on high-impact areas and ceramic coating over the entire vehicle. This combination provides the best of both worlds: physical protection and chemical resistance.
+
+Contact Wheelspa for a personalized recommendation based on your driving conditions and budget.`,
+    
+    2: `The Indian summer can be brutal on your car. Here are essential tips to keep your vehicle protected:
+
+**1. Park Smart**
+Always try to park in shaded areas or use a car cover. Prolonged sun exposure can fade paint and damage interior materials.
+
+**2. Wax Regularly**
+Apply a quality wax or sealant every 3-4 months. This creates a protective barrier against UV rays and environmental contaminants.
+
+**3. Interior Protection**
+Use sunshades on windshields and tinted windows to protect dashboard and seats from cracking and fading.
+
+**4. Check Your Coolant**
+Ensure your cooling system is working properly. Summer is when most overheating issues occur.
+
+**5. Tire Care**
+Hot roads can cause tire blowouts. Check tire pressure regularly as it fluctuates with temperature changes.
+
+For professional summer car care, visit Wheelspa for ceramic coating and PPF that provide excellent UV protection.`,
+    
+    3: `Graphene coatings are the newest innovation in automotive protection. But do they live up to the hype?
+
+**What is Graphene?**
+Graphene is a single layer of carbon atoms arranged in a hexagonal lattice. It's incredibly strong, lightweight, and has excellent thermal conductivity.
+
+**Benefits Over Ceramic**
+• Better heat dissipation - reduces water spotting
+• Anti-static properties - repels dust
+• Increased durability
+• Superior scratch resistance
+
+**The Reality**
+While graphene coatings offer improvements over traditional ceramic, the differences are incremental rather than revolutionary. They cost more but provide marginally better performance.
+
+**Our Recommendation**
+For most vehicles, a high-quality ceramic coating provides excellent protection. Graphene is worth considering for:
+• High-end luxury vehicles
+• Cars in extremely hot climates
+• Show cars requiring the absolute best finish
+
+At Wheelspa, we offer both options and can help you decide which is right for your vehicle.`,
+    
+    4: `Finding the perfect wash frequency depends on several factors:
+
+**Daily Drivers in Urban Areas**
+Wash every 1-2 weeks. City pollution, bird droppings, and road grime accumulate quickly.
+
+**Highway Commuters**
+Wash every 2-3 weeks. Highway driving means more bug splatter and tar spots.
+
+**Garaged Vehicles**
+Wash every 3-4 weeks or as needed. Less exposure means less frequent washing required.
+
+**Coated Vehicles (Ceramic/Graphene)**
+The hydrophobic properties mean dirt doesn't stick as easily. Washing every 3-4 weeks is usually sufficient, with quick rinses in between.
+
+**Important Tips**
+• Always use pH-neutral car shampoo
+• Avoid automatic car washes with brushes
+• Dry your car completely to prevent water spots
+• Never wash in direct sunlight
+
+Visit Wheelspa for professional maintenance washes that keep your coating in top condition.`
+  };
+
+  const openArticle = (post) => {
+    setSelectedArticle(post);
+    setArticleDialogOpen(true);
+  };
+
   const comparisonData = [
     {
       feature: 'Protection Level',
