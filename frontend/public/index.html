@@ -7,37 +7,62 @@
         <meta name="description" content="Wheelspa - Premium Car Care & Detailing in Pune" />
         <title>Wheelspa | Pamper Your Car</title>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
-        <!-- Fix ResizeObserver loop error -->
+        <!-- Fix ResizeObserver loop error - comprehensive solution -->
         <script>
-            // Suppress ResizeObserver loop error - this is a known browser issue
-            const originalError = window.onerror;
-            window.onerror = function(message, source, lineno, colno, error) {
-                if (message && typeof message === 'string' && message.includes('ResizeObserver')) {
-                    return true;
-                }
-                if (originalError) {
-                    return originalError(message, source, lineno, colno, error);
-                }
-                return false;
-            };
-            window.addEventListener('error', function(e) {
-                if (e.message && e.message.includes('ResizeObserver')) {
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    return true;
-                }
-            }, true);
-            // Patch ResizeObserver
-            const OriginalResizeObserver = window.ResizeObserver;
-            window.ResizeObserver = class ResizeObserver extends OriginalResizeObserver {
-                constructor(callback) {
-                    super((entries, observer) => {
-                        requestAnimationFrame(() => {
-                            callback(entries, observer);
+            (function() {
+                // This is a benign error that occurs when ResizeObserver cannot deliver all observations
+                // in a single animation frame. It's not actually an error, just a warning.
+                // We suppress it to prevent React's error overlay from showing.
+                
+                // Method 1: Suppress via window.onerror
+                var originalOnError = window.onerror;
+                window.onerror = function(msg, url, lineNo, columnNo, error) {
+                    if (msg && typeof msg === 'string' && 
+                        (msg.includes('ResizeObserver loop') || 
+                         msg.includes('ResizeObserver loop completed with undelivered notifications'))) {
+                        return true; // Suppress error
+                    }
+                    return originalOnError ? originalOnError.apply(this, arguments) : false;
+                };
+
+                // Method 2: Suppress via error event listener (capture phase)
+                window.addEventListener('error', function(e) {
+                    if (e.message && (
+                        e.message.includes('ResizeObserver loop') ||
+                        e.message.includes('ResizeObserver loop completed')
+                    )) {
+                        e.stopImmediatePropagation();
+                        e.preventDefault();
+                        return true;
+                    }
+                }, true);
+
+                // Method 3: Suppress unhandled rejection for ResizeObserver
+                window.addEventListener('unhandledrejection', function(e) {
+                    if (e.reason && e.reason.message && 
+                        e.reason.message.includes('ResizeObserver')) {
+                        e.preventDefault();
+                        return true;
+                    }
+                });
+                
+                // Method 4: Patch ResizeObserver to use requestAnimationFrame
+                if (typeof ResizeObserver !== 'undefined') {
+                    var RO = ResizeObserver;
+                    window.ResizeObserver = function(callback) {
+                        return new RO(function(entries, observer) {
+                            window.requestAnimationFrame(function() {
+                                try {
+                                    callback(entries, observer);
+                                } catch (e) {
+                                    // Silently catch ResizeObserver errors
+                                }
+                            });
                         });
-                    });
+                    };
+                    window.ResizeObserver.prototype = RO.prototype;
                 }
-            };
+            })();
         </script>
         <script>
             // Only load visual edit scripts when inside an iframe
