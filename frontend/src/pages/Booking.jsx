@@ -67,8 +67,37 @@ const Booking = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    // Simulate API call - will be replaced with actual backend
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Generate booking ID
+    const newBookingId = 'WS-BK-' + Date.now().toString().slice(-8);
+    
+    // Create booking object
+    const newBooking = {
+      id: newBookingId,
+      customerName: formData.name,
+      phone: formData.phone,
+      email: formData.email || '',
+      service: formData.service,
+      serviceName: services.find(s => s.id === formData.service)?.name || formData.service,
+      carBrand: formData.carBrand,
+      carModel: formData.carModel,
+      appointmentDate: formData.date ? formData.date.toISOString() : null,
+      timeSlot: formData.timeSlot,
+      notes: formData.notes || '',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    // Save to localStorage
+    const storedBookings = localStorage.getItem('wheelspa_bookings');
+    const bookings = storedBookings ? JSON.parse(storedBookings) : [];
+    bookings.push(newBooking);
+    localStorage.setItem('wheelspa_bookings', JSON.stringify(bookings));
+
+    // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    setBookingId(newBookingId);
     setIsSubmitting(false);
     setIsSubmitted(true);
   };
