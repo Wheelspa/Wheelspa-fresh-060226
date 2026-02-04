@@ -19,6 +19,7 @@ import AdminNewEntry from "./pages/AdminNewEntry";
 import AdminEntries from "./pages/AdminEntries";
 import AdminReports from "./pages/AdminReports";
 import AdminServices from "./pages/AdminServices";
+import AdminBookings from "./pages/AdminBookings";
 
 // Installer Payment Pages
 import InstallerDashboard from "./pages/InstallerDashboard";
@@ -92,6 +93,14 @@ const AdminRoutes = () => {
         element={
           <ProtectedRoute>
             <AdminServices />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/bookings" 
+        element={
+          <ProtectedRoute>
+            <AdminBookings />
           </ProtectedRoute>
         } 
       />
