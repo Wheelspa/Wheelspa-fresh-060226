@@ -112,9 +112,12 @@ const Booking = () => {
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <CheckCircle className="h-10 w-10 text-green-500" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
                   Booking Confirmed!
                 </h2>
+                <p className="text-green-600 font-semibold mb-4">
+                  Booking ID: {bookingId}
+                </p>
                 <p className="text-gray-600 mb-8">
                   Thank you for choosing Wheelspa. We've received your booking request and will contact you shortly to confirm your appointment.
                 </p>
@@ -124,7 +127,7 @@ const Booking = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Service:</span>
                       <span className="text-gray-900 font-medium">
-                        {SERVICES.find(s => s.id === formData.service)?.name}
+                        {services.find(s => s.id === formData.service)?.name}
                       </span>
                     </div>
                     <div className="flex justify-between">
