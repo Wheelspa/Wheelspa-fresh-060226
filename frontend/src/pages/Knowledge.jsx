@@ -238,7 +238,12 @@ Visit Wheelspa for professional maintenance washes that keep your coating in top
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredPosts.map((post) => (
-              <Card key={post.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0">
+              <Card 
+                key={post.id} 
+                className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0 cursor-pointer"
+                onClick={() => openArticle(post)}
+                data-testid={`article-card-${post.id}`}
+              >
                 <div className="relative h-48 overflow-hidden">
                   <img
                     src={post.image}
@@ -262,9 +267,9 @@ Visit Wheelspa for professional maintenance washes that keep your coating in top
                   <p className="text-sm text-gray-600 line-clamp-2 mb-4">
                     {post.excerpt}
                   </p>
-                  <Button variant="link" className="p-0 text-green-600 hover:text-green-700">
+                  <span className="inline-flex items-center text-green-600 hover:text-green-700 font-medium text-sm">
                     Read More <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
+                  </span>
                 </CardContent>
               </Card>
             ))}
