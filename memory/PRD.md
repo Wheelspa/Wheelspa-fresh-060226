@@ -64,6 +64,11 @@ Build a premium 6-page car detailing website named "Wheelspa" with:
 3. **ResizeObserver loop error** - FIXED
    - Added comprehensive error suppression in `/app/frontend/public/index.html`
 
+4. **Knowledge section articles not opening** - FIXED
+   - Made article cards clickable
+   - Added article detail dialog with full content
+   - Articles now display in a modal when clicked
+
 ## Prioritized Backlog
 
 ### P0 - Critical
