@@ -271,7 +271,7 @@ const Booking = () => {
                         <SelectValue placeholder="Choose a service" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SERVICES.map((service) => (
+                        {services.map((service) => (
                           <SelectItem key={service.id} value={service.id}>
                             {service.name}
                           </SelectItem>
