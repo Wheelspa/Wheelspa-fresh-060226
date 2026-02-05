@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, Star, TrendingUp, Award, Target, MessageSquare, 
-  UserCheck, Plus, Eye, Edit, Trash2, BarChart3, Crown
+  UserCheck, Plus, Eye, Edit, Trash2, BarChart3, Crown, ShieldAlert
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -34,6 +35,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const EmployeePerformance = () => {
   const { admin } = useAdminAuth();
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
