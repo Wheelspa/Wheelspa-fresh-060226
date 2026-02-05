@@ -56,6 +56,7 @@ const AdminLayout = ({ children, title }) => {
   // Role-specific nav items
   const showApprovals = admin && (admin.role === 'superadmin' || admin.role === 'owner');
   const showUserManagement = admin && admin.role === 'owner';
+  const showPerformance = admin && admin.role === 'owner';
 
   const approvalNavItem = showApprovals ? [
     { path: '/admin/approvals', label: 'Approval Requests', icon: ClipboardCheck, badge: pendingApprovals }
@@ -65,8 +66,12 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/users', label: 'Manage Users', icon: UserPlus }
   ] : [];
 
+  const performanceNavItem = showPerformance ? [
+    { path: '/admin/performance', label: 'Employee Performance', icon: Star }
+  ] : [];
+
   const isActive = (path) => location.pathname === path;
-  const showAdminSection = showApprovals || showUserManagement;
+  const showAdminSection = showApprovals || showUserManagement || showPerformance;
 
   return (
     <div className="min-h-screen bg-gray-100">
