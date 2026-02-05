@@ -79,6 +79,14 @@ Build a premium 6-page car detailing website named "Wheelspa" with:
    - User management page (owner only)
    - Approval requests page (superadmin & owner)
 
+6. **Employee Performance Matrix** - COMPLETE (Owner Only)
+   - 5 evaluation criteria: Sincerity, Target Achievement, Personality Improvement, Communication, Leadership
+   - 1-10 rating scale with automatic grade calculation
+   - Grades: Outstanding (9+), Excellent (7-9), Good (5-7), Needs Improvement (3-5), Poor (<3)
+   - Salary recommendation dropdown for hike decisions
+   - 3 views: Summary ranking, Employee cards, Review History
+   - Full CRUD (Create, Edit, Delete reviews)
+
 ## Prioritized Backlog
 
 ### P0 - Critical
