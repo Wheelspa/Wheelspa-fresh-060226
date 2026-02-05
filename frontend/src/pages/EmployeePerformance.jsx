@@ -62,9 +62,19 @@ const EmployeePerformance = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Check if user is owner - redirect if not
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (admin && admin.role !== 'owner') {
+      toast.error('Access denied. Owner only.');
+      navigate('/admin/dashboard');
+    }
+  }, [admin, navigate]);
+
+  useEffect(() => {
+    if (admin?.role === 'owner') {
+      fetchData();
+    }
+  }, [admin]);
 
   const fetchData = async () => {
     try {
