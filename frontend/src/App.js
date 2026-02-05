@@ -158,6 +158,15 @@ const AdminRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      {/* Employee Performance (Owner only) */}
+      <Route 
+        path="/performance" 
+        element={
+          <ProtectedRoute>
+            <EmployeePerformance />
+          </ProtectedRoute>
+        } 
+      />
     </Routes>
   );
 };
