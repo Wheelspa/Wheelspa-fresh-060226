@@ -235,6 +235,24 @@ const EmployeePerformance = () => {
     'Performance Bonus'
   ];
 
+  // Show access denied if not owner
+  if (admin && admin.role !== 'owner') {
+    return (
+      <AdminLayout title="Employee Performance">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-12 text-center">
+            <ShieldAlert className="h-16 w-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h3>
+            <p className="text-gray-500 mb-4">This page is only accessible to the Owner.</p>
+            <Button onClick={() => navigate('/admin/dashboard')} className="bg-green-500 hover:bg-green-600">
+              Return to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout title="Employee Performance">
       {/* Header Stats */}
