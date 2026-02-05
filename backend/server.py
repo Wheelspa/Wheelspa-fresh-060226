@@ -518,6 +518,211 @@ async def delete_installer_payment(payment_id: str, current_user: dict = Depends
     else:
         raise HTTPException(status_code=403, detail="Admin users must submit an approval request to delete")
 
+# ============== EMPLOYEE PERFORMANCE (Owner Only) ==============
+
+class PerformanceReview(BaseModel):
+    employee_id: str
+    employee_name: str
+    review_period: str  # e.g., "Q1 2025", "Jan 2025"
+    sincerity: int  # 1-10
+    target_achievement: int  # 1-10
+    personality_improvement: int  # 1-10
+    communication: int  # 1-10
+    leadership: int  # 1-10
+    comments: Optional[str] = None
+    salary_recommendation: Optional[str] = None  # e.g., "10% hike", "No change"
+
+@api_router.get("/performance/employees")
+async def get_employees_for_review(current_user: dict = Depends(get_current_user)):
+    """Get all employees (admin, superadmin) for performance review - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    # Get all non-owner users as employees
+    employees = await db.users.find(
+        {"role": {"$in": ["admin", "superadmin"]}},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    return employees
+
+@api_router.post("/performance/reviews")
+async def create_performance_review(review: PerformanceReview, current_user: dict = Depends(get_current_user)):
+    """Create a new performance review - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    # Calculate total and average score
+    scores = [review.sincerity, review.target_achievement, review.personality_improvement, 
+              review.communication, review.leadership]
+    total_score = sum(scores)
+    average_score = total_score / len(scores)
+    
+    # Determine performance grade
+    if average_score >= 9:
+        grade = "Outstanding"
+    elif average_score >= 7:
+        grade = "Excellent"
+    elif average_score >= 5:
+        grade = "Good"
+    elif average_score >= 3:
+        grade = "Needs Improvement"
+    else:
+        grade = "Poor"
+    
+    review_doc = {
+        "id": str(uuid.uuid4()),
+        "employee_id": review.employee_id,
+        "employee_name": review.employee_name,
+        "review_period": review.review_period,
+        "sincerity": review.sincerity,
+        "target_achievement": review.target_achievement,
+        "personality_improvement": review.personality_improvement,
+        "communication": review.communication,
+        "leadership": review.leadership,
+        "total_score": total_score,
+        "average_score": round(average_score, 2),
+        "grade": grade,
+        "comments": review.comments,
+        "salary_recommendation": review.salary_recommendation,
+        "reviewed_by": current_user["username"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.performance_reviews.insert_one(review_doc)
+    review_doc.pop("_id", None)
+    return review_doc
+
+@api_router.get("/performance/reviews")
+async def get_performance_reviews(
+    employee_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all performance reviews - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    query = {}
+    if employee_id:
+        query["employee_id"] = employee_id
+    
+    reviews = await db.performance_reviews.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return reviews
+
+@api_router.get("/performance/reviews/{review_id}")
+async def get_performance_review(review_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific performance review - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    review = await db.performance_reviews.find_one({"id": review_id}, {"_id": 0})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return review
+
+@api_router.put("/performance/reviews/{review_id}")
+async def update_performance_review(
+    review_id: str, 
+    review_data: dict, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a performance review - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    # Recalculate scores if criteria are updated
+    if any(key in review_data for key in ["sincerity", "target_achievement", "personality_improvement", "communication", "leadership"]):
+        existing = await db.performance_reviews.find_one({"id": review_id})
+        if existing:
+            scores = [
+                review_data.get("sincerity", existing.get("sincerity", 0)),
+                review_data.get("target_achievement", existing.get("target_achievement", 0)),
+                review_data.get("personality_improvement", existing.get("personality_improvement", 0)),
+                review_data.get("communication", existing.get("communication", 0)),
+                review_data.get("leadership", existing.get("leadership", 0))
+            ]
+            total_score = sum(scores)
+            average_score = total_score / len(scores)
+            
+            if average_score >= 9:
+                grade = "Outstanding"
+            elif average_score >= 7:
+                grade = "Excellent"
+            elif average_score >= 5:
+                grade = "Good"
+            elif average_score >= 3:
+                grade = "Needs Improvement"
+            else:
+                grade = "Poor"
+            
+            review_data["total_score"] = total_score
+            review_data["average_score"] = round(average_score, 2)
+            review_data["grade"] = grade
+    
+    review_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.performance_reviews.update_one({"id": review_id}, {"$set": review_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return {"message": "Review updated successfully"}
+
+@api_router.delete("/performance/reviews/{review_id}")
+async def delete_performance_review(review_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a performance review - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    result = await db.performance_reviews.delete_one({"id": review_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return {"message": "Review deleted successfully"}
+
+@api_router.get("/performance/summary")
+async def get_performance_summary(current_user: dict = Depends(get_current_user)):
+    """Get performance summary statistics - Owner only"""
+    await require_role(["owner"], current_user)
+    
+    # Get all reviews
+    reviews = await db.performance_reviews.find({}, {"_id": 0}).to_list(1000)
+    
+    # Get unique employees
+    employees = await db.users.find(
+        {"role": {"$in": ["admin", "superadmin"]}},
+        {"_id": 0, "id": 1, "name": 1, "username": 1, "role": 1}
+    ).to_list(100)
+    
+    # Calculate stats per employee
+    employee_stats = []
+    for emp in employees:
+        emp_reviews = [r for r in reviews if r["employee_id"] == emp["id"]]
+        if emp_reviews:
+            latest_review = emp_reviews[0]  # Already sorted by created_at desc
+            avg_score = sum(r["average_score"] for r in emp_reviews) / len(emp_reviews)
+            employee_stats.append({
+                "employee_id": emp["id"],
+                "employee_name": emp.get("name", emp["username"]),
+                "role": emp["role"],
+                "total_reviews": len(emp_reviews),
+                "latest_grade": latest_review["grade"],
+                "latest_score": latest_review["average_score"],
+                "average_score_all_time": round(avg_score, 2),
+                "latest_recommendation": latest_review.get("salary_recommendation", "N/A")
+            })
+        else:
+            employee_stats.append({
+                "employee_id": emp["id"],
+                "employee_name": emp.get("name", emp["username"]),
+                "role": emp["role"],
+                "total_reviews": 0,
+                "latest_grade": "Not Reviewed",
+                "latest_score": 0,
+                "average_score_all_time": 0,
+                "latest_recommendation": "N/A"
+            })
+    
+    # Sort by latest score descending
+    employee_stats.sort(key=lambda x: x["latest_score"], reverse=True)
+    
+    return {
+        "total_employees": len(employees),
+        "total_reviews": len(reviews),
+        "employee_stats": employee_stats
+    }
+
 # ============== SEED DEFAULT OWNER ==============
 
 @app.on_event("startup")
