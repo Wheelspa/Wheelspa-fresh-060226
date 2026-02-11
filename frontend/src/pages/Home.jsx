@@ -4,6 +4,7 @@ import { ArrowRight, Shield, Sparkles, Award, Users, Building, ThumbsUp, Star, C
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import Layout from '../components/layout/Layout';
+import BookingQRCode from '../components/BookingQRCode';
 import { BRAND_INFO, HERO_IMAGES, SERVICES, TESTIMONIALS, STATS, WHY_WHEELSPA } from '../data/mock';
 
 const iconMap = {
