@@ -250,7 +250,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section with QR Code */}
       <section className="py-20 bg-green-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
@@ -258,21 +258,25 @@ const Home = () => {
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
                 Ready to Pamper Your Car?
               </h2>
-              <p className="text-green-100 text-lg">
+              <p className="text-green-100 text-lg mb-6">
                 Book your appointment today and experience the Wheelspa difference.
               </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link to="/booking">
+                  <Button size="lg" className="bg-white text-green-600 hover:bg-gray-100 text-lg px-8">
+                    Book Appointment
+                  </Button>
+                </Link>
+                <a href={`tel:${BRAND_INFO.phones[0].replace(/-/g, '')}`}>
+                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 text-lg px-8">
+                    Call Now
+                  </Button>
+                </a>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/booking">
-                <Button size="lg" className="bg-white text-green-600 hover:bg-gray-100 text-lg px-8">
-                  Book Appointment
-                </Button>
-              </Link>
-              <a href={`tel:${BRAND_INFO.phones[0].replace(/-/g, '')}`}>
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 text-lg px-8">
-                  Call Now
-                </Button>
-              </a>
+            {/* QR Code */}
+            <div className="bg-white rounded-2xl p-2 shadow-2xl">
+              <BookingQRCode size={160} showShare={false} />
             </div>
           </div>
         </div>
