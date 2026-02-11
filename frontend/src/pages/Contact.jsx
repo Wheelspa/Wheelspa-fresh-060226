@@ -306,6 +306,11 @@ const Contact = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* QR Code for Booking */}
+              <div className="mt-6">
+                <BookingQRCode size={180} />
+              </div>
             </div>
           </div>
         </div>
