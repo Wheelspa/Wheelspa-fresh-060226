@@ -194,6 +194,7 @@ function App() {
             <Route path="/booking" element={<Booking />} />
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/token-display" element={<TokenDisplay />} />
             
             {/* Admin Routes */}
             <Route path="/admin/*" element={<AdminRoutes />} />
