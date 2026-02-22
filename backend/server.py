@@ -484,10 +484,112 @@ async def get_entries(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/entries")
 async def create_entry(entry: dict, current_user: dict = Depends(get_current_user)):
+    # Generate token number for today
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Count today's entries to generate sequential token
+    today_count = await db.entries.count_documents({
+        "created_at": {"$regex": f"^{today}"}
+    })
+    token_number = today_count + 1
+    token_display = f"WS-{token_number:03d}"
+    
     entry["id"] = str(uuid.uuid4())
+    entry["token_number"] = token_number
+    entry["token_display"] = token_display
+    entry["token_status"] = "waiting"  # waiting, in_progress, completed
     entry["created_at"] = datetime.now(timezone.utc).isoformat()
     entry["created_by"] = current_user["username"]
     await db.entries.insert_one(entry)
+    entry.pop("_id", None)
+    return entry
+
+# ============== TOKEN SYSTEM ==============
+
+@api_router.get("/tokens/display")
+async def get_token_display():
+    """Get tokens for public display - No auth required"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get today's entries with tokens
+    entries = await db.entries.find(
+        {"created_at": {"$regex": f"^{today}"}},
+        {"_id": 0}
+    ).sort("token_number", 1).to_list(100)
+    
+    # Categorize by status
+    waiting = [e for e in entries if e.get("token_status") == "waiting"]
+    in_progress = [e for e in entries if e.get("token_status") == "in_progress"]
+    completed = [e for e in entries if e.get("token_status") == "completed"]
+    
+    # Get the current token being served (first in_progress or first waiting)
+    current_token = None
+    if in_progress:
+        current_token = in_progress[0]
+    elif waiting:
+        current_token = waiting[0]
+    
+    return {
+        "date": today,
+        "current_token": current_token,
+        "waiting": waiting,
+        "in_progress": in_progress,
+        "completed": completed,
+        "total_today": len(entries),
+        "waiting_count": len(waiting),
+        "in_progress_count": len(in_progress),
+        "completed_count": len(completed)
+    }
+
+@api_router.put("/tokens/{entry_id}/status")
+async def update_token_status(entry_id: str, status_data: dict, current_user: dict = Depends(get_current_user)):
+    """Update token status - Admin only"""
+    new_status = status_data.get("status")
+    if new_status not in ["waiting", "in_progress", "completed"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    update_data = {
+        "token_status": new_status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if new_status == "in_progress":
+        update_data["started_at"] = datetime.now(timezone.utc).isoformat()
+    elif new_status == "completed":
+        update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.entries.update_one({"id": entry_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    return {"message": f"Token status updated to {new_status}"}
+
+@api_router.post("/tokens/call-next")
+async def call_next_token(current_user: dict = Depends(get_current_user)):
+    """Call the next waiting token - Admin only"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Mark current in_progress as completed
+    await db.entries.update_many(
+        {"token_status": "in_progress", "created_at": {"$regex": f"^{today}"}},
+        {"$set": {"token_status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Get next waiting token
+    next_token = await db.entries.find_one(
+        {"token_status": "waiting", "created_at": {"$regex": f"^{today}"}},
+        {"_id": 0},
+        sort=[("token_number", 1)]
+    )
+    
+    if next_token:
+        await db.entries.update_one(
+            {"id": next_token["id"]},
+            {"$set": {"token_status": "in_progress", "started_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"message": f"Now serving token {next_token['token_display']}", "token": next_token}
+    
+    return {"message": "No more tokens in queue", "token": None}
     entry.pop("_id", None)
     return entry
 
