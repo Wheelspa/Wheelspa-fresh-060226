@@ -376,53 +376,118 @@ const Booking = () => {
                     <Clock className="h-5 w-5 text-green-500 mr-2" />
                     Preferred Date & Time
                   </h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <Label>Select Date *</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={`w-full mt-2 justify-start text-left font-normal ${
-                              !formData.date && 'text-muted-foreground'
-                            } ${errors.date ? 'border-red-500' : ''}`}
-                          >
-                            <Calendar className="mr-2 h-4 w-4" />
-                            {formData.date ? format(formData.date, 'PPP') : 'Pick a date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={formData.date}
-                            onSelect={(date) => handleInputChange('date', date)}
-                            disabled={(date) => date < new Date()}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
-                    </div>
-                    <div>
-                      <Label>Select Time Slot *</Label>
-                      <Select
-                        value={formData.timeSlot}
-                        onValueChange={(value) => handleInputChange('timeSlot', value)}
-                      >
-                        <SelectTrigger className={`mt-2 ${errors.timeSlot ? 'border-red-500' : ''}`}>
-                          <SelectValue placeholder="Choose time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeSlots.map((slot) => (
-                            <SelectItem key={slot} value={slot}>
-                              {slot}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors.timeSlot && <p className="text-red-500 text-sm mt-1">{errors.timeSlot}</p>}
-                    </div>
+                  
+                  {/* Date Selection */}
+                  <div className="mb-6">
+                    <Label>Select Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={`w-full mt-2 justify-start text-left font-normal ${
+                            !formData.date && 'text-muted-foreground'
+                          } ${errors.date ? 'border-red-500' : ''}`}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {formData.date ? format(formData.date, 'PPP') : 'Pick a date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={formData.date}
+                          onSelect={(date) => handleInputChange('date', date)}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
                   </div>
+
+                  {/* Slot Availability Legend */}
+                  {formData.date && (
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Slot Availability:</p>
+                      <div className="flex flex-wrap gap-4 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded bg-white border-2 border-gray-300"></div>
+                          <span className="text-gray-600">Available</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded bg-yellow-400 border-2 border-yellow-500"></div>
+                          <span className="text-gray-600">Booked (Payment Pending)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded bg-green-500 border-2 border-green-600"></div>
+                          <span className="text-gray-600">Booked & Paid</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Visual Slot Grid */}
+                  {formData.date && (
+                    <div className="mb-6">
+                      <Label className="mb-3 block">Select Time Slot * <span className="text-gray-500 text-sm">(Tap to select)</span></Label>
+                      {loadingSlots ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                          {timeSlots.map((time) => {
+                            const slotInfo = slots.find(s => s.time === time);
+                            const isBooked = slotInfo && slotInfo.status !== 'available';
+                            const isPaid = slotInfo?.status === 'booked_paid';
+                            const isUnpaid = slotInfo?.status === 'booked_unpaid';
+                            const isSelected = formData.timeSlot === time;
+                            
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                disabled={isBooked}
+                                onClick={() => !isBooked && handleInputChange('timeSlot', time)}
+                                className={`
+                                  p-3 rounded-xl border-2 transition-all text-center
+                                  ${isSelected 
+                                    ? 'bg-green-500 border-green-600 text-white ring-2 ring-green-300' 
+                                    : isPaid 
+                                      ? 'bg-green-500 border-green-600 text-white cursor-not-allowed opacity-80'
+                                      : isUnpaid
+                                        ? 'bg-yellow-400 border-yellow-500 text-gray-900 cursor-not-allowed opacity-80'
+                                        : 'bg-white border-gray-200 hover:border-green-400 hover:bg-green-50 text-gray-700'
+                                  }
+                                `}
+                              >
+                                <div className="flex flex-col items-center gap-1">
+                                  {isPaid ? (
+                                    <CheckCircle className="h-4 w-4" />
+                                  ) : isUnpaid ? (
+                                    <AlertCircle className="h-4 w-4" />
+                                  ) : isSelected ? (
+                                    <CheckCircle className="h-4 w-4" />
+                                  ) : (
+                                    <Clock className="h-4 w-4 text-gray-400" />
+                                  )}
+                                  <span className="font-medium text-sm">{time}</span>
+                                  {isBooked && (
+                                    <span className="text-xs opacity-75">Booked</span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {errors.timeSlot && <p className="text-red-500 text-sm mt-2">{errors.timeSlot}</p>}
+                    </div>
+                  )}
+
+                  {!formData.date && (
+                    <p className="text-gray-500 text-sm italic">Please select a date to see available time slots</p>
+                  )}
                 </div>
 
                 {/* Additional Notes */}
