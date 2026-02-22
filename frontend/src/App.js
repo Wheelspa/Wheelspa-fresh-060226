@@ -11,6 +11,7 @@ import Services from "./pages/Services";
 import Booking from "./pages/Booking";
 import Knowledge from "./pages/Knowledge";
 import Contact from "./pages/Contact";
+import TokenDisplay from "./pages/TokenDisplay";
 
 // Admin Pages
 import AdminLogin from "./pages/AdminLogin";
