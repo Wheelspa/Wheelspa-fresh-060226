@@ -31,6 +31,8 @@ const Booking = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingId, setBookingId] = useState('');
   const [errors, setErrors] = useState({});
+  const [slots, setSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   useEffect(() => {
     // Load services from localStorage
@@ -38,10 +40,33 @@ const Booking = () => {
     setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
   }, []);
 
+  // Fetch slots when date changes
+  useEffect(() => {
+    if (formData.date) {
+      fetchSlots(formData.date);
+    }
+  }, [formData.date]);
+
+  const fetchSlots = async (date) => {
+    setLoadingSlots(true);
+    try {
+      const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const response = await fetch(`${API_URL}/api/bookings/slots/${formattedDate}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSlots(data.slots);
+      }
+    } catch (error) {
+      console.error('Error fetching slots:', error);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
   const timeSlots = [
     '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
     '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM',
-    '05:00 PM', '06:00 PM', '07:00 PM'
+    '05:00 PM'
   ];
 
   const handleInputChange = (field, value) => {
