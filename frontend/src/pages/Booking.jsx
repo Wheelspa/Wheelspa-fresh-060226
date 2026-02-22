@@ -71,31 +71,52 @@ const Booking = () => {
     // Generate booking ID
     const newBookingId = 'WS-BK-' + Date.now().toString().slice(-8);
     
+    // Format date as yyyy-MM-dd for the API
+    const formattedDate = formData.date ? 
+      `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}` 
+      : null;
+    
     // Create booking object
     const newBooking = {
       id: newBookingId,
       customerName: formData.name,
+      customer_name: formData.name,
       phone: formData.phone,
       email: formData.email || '',
       service: formData.service,
       serviceName: services.find(s => s.id === formData.service)?.name || formData.service,
       carBrand: formData.carBrand,
       carModel: formData.carModel,
-      appointmentDate: formData.date ? formData.date.toISOString() : null,
+      appointmentDate: formattedDate,
+      appointment_date: formattedDate,
       timeSlot: formData.timeSlot,
+      time_slot: formData.timeSlot,
       notes: formData.notes || '',
       status: 'pending',
+      payment_status: 'unpaid',
       createdAt: new Date().toISOString()
     };
 
-    // Save to localStorage
-    const storedBookings = localStorage.getItem('wheelspa_bookings');
-    const bookings = storedBookings ? JSON.parse(storedBookings) : [];
-    bookings.push(newBooking);
-    localStorage.setItem('wheelspa_bookings', JSON.stringify(bookings));
-
-    // Simulate delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Save to backend API
+    try {
+      const API_URL = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(`${API_URL}/api/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newBooking)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save booking');
+      }
+    } catch (error) {
+      console.error('Error saving to backend:', error);
+      // Fallback: Save to localStorage
+      const storedBookings = localStorage.getItem('wheelspa_bookings');
+      const bookings = storedBookings ? JSON.parse(storedBookings) : [];
+      bookings.push(newBooking);
+      localStorage.setItem('wheelspa_bookings', JSON.stringify(bookings));
+    }
     
     setBookingId(newBookingId);
     setIsSubmitting(false);
