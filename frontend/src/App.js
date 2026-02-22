@@ -23,6 +23,7 @@ import AdminBookings from "./pages/AdminBookings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminApprovals from "./pages/AdminApprovals";
 import EmployeePerformance from "./pages/EmployeePerformance";
+import BookingSlots from "./pages/BookingSlots";
 
 // Installer Payment Pages
 import InstallerDashboard from "./pages/InstallerDashboard";
