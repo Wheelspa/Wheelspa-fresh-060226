@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Car, User, Phone, IndianRupee, CreditCard, 
-  Calendar, Clock, CheckCircle, UserCheck, Save
+  Calendar, Clock, CheckCircle, UserCheck, Save, Ticket, ExternalLink
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,14 +10,26 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import AdminLayout from '../components/admin/AdminLayout';
-import { PAYMENT_MODES, JOB_STATUS, STAFF_MEMBERS, MOCK_ENTRIES } from '../data/adminMock';
+import { useAdminAuth } from '../context/AdminAuthContext';
+import { PAYMENT_MODES, JOB_STATUS, STAFF_MEMBERS } from '../data/adminMock';
 import { SERVICES } from '../data/mock';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const AdminNewEntry = () => {
   const navigate = useNavigate();
+  const { admin } = useAdminAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState(null);
   const [formData, setFormData] = useState({
     customerName: '',
     carNumber: '',
@@ -33,11 +45,9 @@ const AdminNewEntry = () => {
   const [errors, setErrors] = useState({});
 
   const handleInputChange = (field, value) => {
-    // Format car number
     if (field === 'carNumber') {
       value = formatCarNumber(value);
     }
-    // Format mobile number
     if (field === 'mobileNumber') {
       value = value.replace(/\D/g, '').slice(0, 10);
     }
@@ -48,10 +58,7 @@ const AdminNewEntry = () => {
   };
 
   const formatCarNumber = (value) => {
-    // Remove all non-alphanumeric characters except hyphens
     let formatted = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    
-    // Auto-format: MH-12-AB-1234
     const parts = formatted.replace(/-/g, '');
     if (parts.length <= 2) {
       formatted = parts;
@@ -62,7 +69,6 @@ const AdminNewEntry = () => {
     } else {
       formatted = `${parts.slice(0, 2)}-${parts.slice(2, 4)}-${parts.slice(4, 6)}-${parts.slice(6, 10)}`;
     }
-    
     return formatted;
   };
 
@@ -90,33 +96,89 @@ const AdminNewEntry = () => {
 
     setIsSubmitting(true);
 
-    // Create new entry
-    const newEntry = {
-      id: Date.now().toString(),
-      ...formData,
-      amount: parseFloat(formData.amount),
-      cashHandoverApproved: formData.paymentMode === 'cash',
-      entryDate: new Date().toISOString(),
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const entryData = {
+        customerName: formData.customerName,
+        customer_name: formData.customerName,
+        carNumber: formData.carNumber,
+        car_number: formData.carNumber,
+        mobileNumber: formData.mobileNumber,
+        mobile_number: formData.mobileNumber,
+        serviceType: formData.serviceType,
+        service_type: formData.serviceType,
+        serviceName: SERVICES.find(s => s.id === formData.serviceType)?.name || formData.serviceType,
+        amount: parseFloat(formData.amount),
+        paymentMode: formData.paymentMode,
+        payment_mode: formData.paymentMode,
+        receivedBy: formData.receivedBy,
+        received_by: formData.receivedBy,
+        cashHandoverTo: formData.cashHandoverTo,
+        cash_handover_to: formData.cashHandoverTo,
+        cashHandoverApproved: formData.paymentMode === 'cash',
+        jobStatus: formData.jobStatus,
+        job_status: formData.jobStatus,
+        notes: formData.notes
+      };
 
-    // Save to localStorage (will be replaced with API call)
-    const storedEntries = localStorage.getItem('wheelspa_entries');
-    const entries = storedEntries ? JSON.parse(storedEntries) : MOCK_ENTRIES;
-    entries.push(newEntry);
-    localStorage.setItem('wheelspa_entries', JSON.stringify(entries));
+      const response = await fetch(`${API_URL}/api/entries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify(entryData)
+      });
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
+      if (response.ok) {
+        const data = await response.json();
+        setGeneratedToken(data);
+        setTokenDialogOpen(true);
+        toast.success('Vehicle entry added successfully!');
+        
+        // Reset form
+        setFormData({
+          customerName: '',
+          carNumber: '',
+          mobileNumber: '',
+          serviceType: '',
+          amount: '',
+          paymentMode: '',
+          receivedBy: '',
+          cashHandoverTo: '',
+          jobStatus: 'pending',
+          notes: ''
+        });
+      } else {
+        throw new Error('Failed to create entry');
+      }
+    } catch (error) {
+      console.error('Error creating entry:', error);
+      toast.error('Failed to create entry. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    setIsSubmitting(false);
-    toast.success('Vehicle entry added successfully!');
-    navigate('/admin/entries');
+  const openTokenDisplay = () => {
+    window.open('/token-display', '_blank');
   };
 
   return (
     <AdminLayout title="New Vehicle Entry">
       <div className="max-w-3xl mx-auto">
+        {/* Quick Link to Token Display */}
+        <div className="mb-4 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={openTokenDisplay}
+            className="text-green-600 border-green-500 hover:bg-green-50"
+          >
+            <Ticket className="h-4 w-4 mr-2" />
+            Open Token Display
+            <ExternalLink className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+
         <Card className="border-0 shadow-lg">
           <CardHeader className="border-b bg-gray-50">
             <CardTitle className="flex items-center text-xl">
@@ -265,7 +327,6 @@ const AdminNewEntry = () => {
                     {errors.receivedBy && <p className="text-red-500 text-sm mt-1">{errors.receivedBy}</p>}
                   </div>
 
-                  {/* Cash Handover Field - Only shows when Cash is selected */}
                   {formData.paymentMode === 'cash' && (
                     <div>
                       <Label>Cash Handed Over To *</Label>
@@ -353,7 +414,7 @@ const AdminNewEntry = () => {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Save Entry
+                      Save Entry & Generate Token
                     </>
                   )}
                 </Button>
@@ -370,6 +431,64 @@ const AdminNewEntry = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Token Generated Dialog */}
+      <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">
+              Token Generated Successfully!
+            </DialogTitle>
+          </DialogHeader>
+          {generatedToken && (
+            <div className="text-center py-6">
+              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-8 mb-6">
+                <Ticket className="h-12 w-12 mx-auto mb-4 opacity-80" />
+                <p className="text-sm uppercase tracking-wider mb-2">Token Number</p>
+                <p className="text-6xl font-bold">{generatedToken.token_display}</p>
+              </div>
+              
+              <div className="space-y-2 text-left bg-gray-50 rounded-xl p-4 mb-6">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Customer:</span>
+                  <span className="font-medium">{generatedToken.customerName || generatedToken.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Car Number:</span>
+                  <span className="font-mono font-medium">{generatedToken.carNumber || generatedToken.car_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Service:</span>
+                  <span className="font-medium">{generatedToken.serviceName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Status:</span>
+                  <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                    Waiting
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={openTokenDisplay}
+                  className="flex-1 bg-green-500 hover:bg-green-600"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Display
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setTokenDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Add Another
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
