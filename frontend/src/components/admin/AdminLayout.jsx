@@ -40,6 +40,7 @@ const AdminLayout = ({ children, title }) => {
   const navItems = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: Home },
     { path: '/admin/bookings', label: 'Customer Bookings', icon: CalendarCheck },
+    { path: '/admin/slots', label: 'Booking Slots', icon: CalendarDays },
     { path: '/admin/new-entry', label: 'New Entry', icon: Plus },
     { path: '/admin/entries', label: 'All Entries', icon: List },
     { path: '/admin/reports', label: 'Reports', icon: BarChart3 },
