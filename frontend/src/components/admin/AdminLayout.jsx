@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
   Home, ChevronRight, Bell, Wallet, Users, Settings, CalendarCheck,
-  Crown, Shield, UserCog, ClipboardCheck, UserPlus, Star
+  Crown, Shield, UserCog, ClipboardCheck, UserPlus, Star, CalendarDays
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
