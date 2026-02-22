@@ -349,9 +349,110 @@ async def create_booking(booking: dict):
     booking["id"] = booking.get("id", str(uuid.uuid4()))
     booking["created_at"] = datetime.now(timezone.utc).isoformat()
     booking["status"] = booking.get("status", "pending")
+    booking["payment_status"] = booking.get("payment_status", "unpaid")  # unpaid, paid
     await db.bookings.insert_one(booking)
     booking.pop("_id", None)
     return booking
+
+@api_router.get("/bookings/slots")
+async def get_booking_slots(date: Optional[str] = None):
+    """Get booking slots with availability status - Public endpoint"""
+    # Define available time slots
+    time_slots = [
+        "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
+    ]
+    
+    # Get bookings for the specified date or all upcoming
+    query = {}
+    if date:
+        query["appointment_date"] = date
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(100)
+    
+    # Create slot status map
+    slot_map = {}
+    for booking in bookings:
+        key = f"{booking.get('appointment_date')}_{booking.get('time_slot')}"
+        payment_status = booking.get('payment_status', 'unpaid')
+        booking_status = booking.get('status', 'pending')
+        
+        # Determine slot status
+        if booking_status == 'cancelled':
+            continue  # Cancelled bookings don't block slots
+        elif payment_status == 'paid':
+            slot_map[key] = {
+                "status": "booked_paid",
+                "booking_id": booking.get("id"),
+                "customer_name": booking.get("customerName", booking.get("customer_name", "Customer"))
+            }
+        else:
+            slot_map[key] = {
+                "status": "booked_unpaid",
+                "booking_id": booking.get("id"),
+                "customer_name": booking.get("customerName", booking.get("customer_name", "Customer"))
+            }
+    
+    return {
+        "time_slots": time_slots,
+        "slot_map": slot_map,
+        "date": date
+    }
+
+@api_router.get("/bookings/slots/{date}")
+async def get_slots_for_date(date: str):
+    """Get slot availability for a specific date - Public endpoint"""
+    time_slots = [
+        "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
+    ]
+    
+    # Get bookings for this date
+    bookings = await db.bookings.find(
+        {"appointment_date": date, "status": {"$ne": "cancelled"}},
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Build slot list with status
+    slots = []
+    for slot in time_slots:
+        booking = next((b for b in bookings if b.get("time_slot") == slot), None)
+        if booking:
+            payment_status = booking.get("payment_status", "unpaid")
+            slots.append({
+                "time": slot,
+                "status": "booked_paid" if payment_status == "paid" else "booked_unpaid",
+                "booking_id": booking.get("id"),
+                "customer_name": booking.get("customerName", booking.get("customer_name", "")),
+                "service": booking.get("serviceName", booking.get("service", ""))
+            })
+        else:
+            slots.append({
+                "time": slot,
+                "status": "available",
+                "booking_id": None,
+                "customer_name": None,
+                "service": None
+            })
+    
+    return {"date": date, "slots": slots}
+
+@api_router.put("/bookings/{booking_id}/payment")
+async def update_booking_payment(booking_id: str, payment_data: dict, current_user: dict = Depends(get_current_user)):
+    """Update payment status for a booking"""
+    update_data = {
+        "payment_status": payment_data.get("payment_status", "paid"),
+        "payment_amount": payment_data.get("amount"),
+        "payment_mode": payment_data.get("payment_mode"),
+        "payment_date": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    result = await db.bookings.update_one({"id": booking_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return {"message": "Payment status updated successfully"}
 
 @api_router.put("/bookings/{booking_id}")
 async def update_booking(booking_id: str, booking_data: dict, current_user: dict = Depends(get_current_user)):
