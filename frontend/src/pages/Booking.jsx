@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Car, User, Phone, Mail, CheckCircle, MapPin, MessageCircle } from 'lucide-react';
+import { Calendar, Clock, Car, User, Phone, Mail, CheckCircle, MapPin, MessageCircle, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import Layout from '../components/layout/Layout';
 import { SERVICES as DEFAULT_SERVICES, CAR_BRANDS, BRAND_INFO } from '../data/mock';
 import { format } from 'date-fns';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Booking = () => {
   const [services, setServices] = useState([]);
