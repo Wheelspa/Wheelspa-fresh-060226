@@ -1,5 +1,23 @@
 import React, { useState } from 'react';
-import { Phone, Mail, MapPin, Clock, MessageCircle, Send, Facebook, Building, CheckCircle } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, MessageCircle, Send, Building, CheckCircle } from 'lucide-react';
+
+const FacebookIcon = ({ className = "h-5 w-5", ...props }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,6 +27,9 @@ import { Card, CardContent } from '../components/ui/card';
 import Layout from '../components/layout/Layout';
 import BookingQRCode from '../components/BookingQRCode';
 import { BRAND_INFO } from '../data/mock';
+import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -29,10 +50,32 @@ const Contact = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    try {
+      const response = await fetch(`${API_URL}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          enquiry_type: formData.enquiryType,
+          subject: formData.subject,
+          message: formData.message
+        })
+      });
+
+      if (response.ok) {
+        setIsSubmitted(true);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Contact submission error:', error);
+      toast.error('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const contactInfo = [
@@ -301,7 +344,7 @@ const Contact = () => {
                       rel="noopener noreferrer"
                       className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors"
                     >
-                      <Facebook className="h-5 w-5" />
+                      <FacebookIcon className="h-5 w-5" />
                     </a>
                   </div>
                 </CardContent>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Car, Search, Filter, Plus, Edit, Trash2, 
+  Car, Search, Plus, Edit, Trash2, 
   Eye, Calendar, Download, RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -11,12 +11,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { MOCK_ENTRIES, JOB_STATUS, PAYMENT_MODES } from '../data/adminMock';
 import { SERVICES } from '../data/mock';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const AdminEntries = () => {
+  const { admin } = useAdminAuth();
   const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,16 +30,47 @@ const AdminEntries = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadEntries();
-  }, []);
+    if (admin?.token) {
+      loadEntries();
+    }
+  }, [admin?.token]);
 
-  const loadEntries = () => {
-    const storedEntries = localStorage.getItem('wheelspa_entries');
-    const allEntries = storedEntries ? JSON.parse(storedEntries) : MOCK_ENTRIES;
-    setEntries(allEntries);
-    setFilteredEntries(allEntries);
+  const normalizeEntry = (e) => ({
+    ...e,
+    customerName: e.customerName || e.customer_name || 'Customer',
+    carNumber: e.carNumber || e.car_number || 'N/A',
+    mobileNumber: e.mobileNumber || e.mobile_number || 'N/A',
+    serviceType: e.serviceType || e.service_type || 'detailing',
+    amount: e.amount || 0,
+    paymentMode: e.paymentMode || e.payment_mode || 'cash',
+    receivedBy: e.receivedBy || e.received_by || 'Staff',
+    jobStatus: e.jobStatus || e.job_status || 'pending',
+    entryDate: e.entryDate || e.created_at || new Date().toISOString()
+  });
+
+  const loadEntries = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/entries`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(normalizeEntry);
+        setEntries(normalized);
+        setFilteredEntries(normalized);
+      } else {
+        toast.error('Failed to load entries from server');
+      }
+    } catch (error) {
+      console.error('Error fetching entries:', error);
+      toast.error('Connection error loading entries');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -90,24 +125,49 @@ const AdminEntries = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (entryToDelete) {
-      const updatedEntries = entries.filter(e => e.id !== entryToDelete.id);
-      localStorage.setItem('wheelspa_entries', JSON.stringify(updatedEntries));
-      setEntries(updatedEntries);
-      toast.success('Entry deleted successfully');
+      try {
+        const response = await fetch(`${API_URL}/api/entries/${entryToDelete.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${admin?.token}` }
+        });
+        if (response.ok) {
+          toast.success('Entry deleted successfully');
+          loadEntries();
+        } else {
+          const data = await response.json().catch(() => ({}));
+          toast.error(data.detail || 'Failed to delete entry');
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        toast.error('Connection error deleting entry');
+      }
     }
     setIsDeleteModalOpen(false);
     setEntryToDelete(null);
   };
 
-  const handleStatusUpdate = (entryId, newStatus) => {
-    const updatedEntries = entries.map(e => 
-      e.id === entryId ? { ...e, jobStatus: newStatus } : e
-    );
-    localStorage.setItem('wheelspa_entries', JSON.stringify(updatedEntries));
-    setEntries(updatedEntries);
-    toast.success('Status updated successfully');
+  const handleStatusUpdate = async (entryId, newStatus) => {
+    try {
+      const response = await fetch(`${API_URL}/api/tokens/${entryId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        toast.success('Status updated successfully');
+        loadEntries();
+      } else {
+        toast.error('Failed to update status');
+      }
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error('Connection error updating status');
+    }
   };
 
   const exportToCSV = () => {

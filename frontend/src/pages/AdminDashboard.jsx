@@ -8,12 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { MOCK_ENTRIES, JOB_STATUS, PAYMENT_MODES } from '../data/adminMock';
 import { SERVICES } from '../data/mock';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const AdminDashboard = () => {
+  const { admin } = useAdminAuth();
   const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalEntries: 0,
     totalRevenue: 0,
@@ -23,25 +29,55 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    // Load entries from localStorage or use mock data
-    const storedEntries = localStorage.getItem('wheelspa_entries');
-    const allEntries = storedEntries ? JSON.parse(storedEntries) : MOCK_ENTRIES;
-    setEntries(allEntries);
+    if (admin?.token) {
+      fetchDashboardData();
+    }
+  }, [admin?.token]);
 
-    // Calculate stats
-    const today = new Date().toDateString();
-    const todayEntries = allEntries.filter(e => 
-      new Date(e.entryDate).toDateString() === today
-    );
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/entries`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(e => ({
+          ...e,
+          customerName: e.customerName || e.customer_name || 'Customer',
+          carNumber: e.carNumber || e.car_number || 'N/A',
+          mobileNumber: e.mobileNumber || e.mobile_number || 'N/A',
+          serviceType: e.serviceType || e.service_type || 'detailing',
+          amount: e.amount || 0,
+          paymentMode: e.paymentMode || e.payment_mode || 'cash',
+          jobStatus: e.jobStatus || e.job_status || 'pending',
+          entryDate: e.entryDate || e.created_at || new Date().toISOString()
+        }));
 
-    setStats({
-      totalEntries: allEntries.length,
-      totalRevenue: allEntries.reduce((sum, e) => sum + e.amount, 0),
-      pendingJobs: allEntries.filter(e => e.jobStatus === 'pending' || e.jobStatus === 'in_progress').length,
-      completedToday: todayEntries.filter(e => e.jobStatus === 'completed').length,
-      cashCollection: todayEntries.filter(e => e.paymentMode === 'cash').reduce((sum, e) => sum + e.amount, 0)
-    });
-  }, []);
+        setEntries(normalized);
+
+        const today = new Date().toDateString();
+        const todayEntries = normalized.filter(e => 
+          new Date(e.entryDate).toDateString() === today
+        );
+
+        setStats({
+          totalEntries: normalized.length,
+          totalRevenue: normalized.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0),
+          pendingJobs: normalized.filter(e => e.jobStatus === 'pending' || e.jobStatus === 'in_progress').length,
+          completedToday: todayEntries.filter(e => e.jobStatus === 'completed').length,
+          cashCollection: todayEntries.filter(e => e.paymentMode === 'cash').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+        });
+      } else {
+        toast.error('Failed to fetch dashboard data');
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Connection error loading dashboard metrics');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getServiceName = (serviceId) => {
     const service = SERVICES.find(s => s.id === serviceId);

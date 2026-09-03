@@ -10,15 +10,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import AdminLayout from '../components/admin/AdminLayout';
-import { INSTALLERS, INSTALLER_CATEGORIES, MOCK_INSTALLER_PAYMENTS } from '../data/installerMock';
+import { useAdminAuth } from '../context/AdminAuthContext';
+import { INSTALLERS as DEFAULT_INSTALLERS, INSTALLER_CATEGORIES, MOCK_INSTALLER_PAYMENTS } from '../data/installerMock';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const InstallerManage = () => {
+  const { admin } = useAdminAuth();
   const [installers, setInstallers] = useState([]);
   const [filteredInstallers, setFilteredInstallers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -34,17 +39,38 @@ const InstallerManage = () => {
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (admin?.token) {
+      loadData();
+    }
+  }, [admin?.token]);
 
-  const loadData = () => {
-    const storedInstallers = localStorage.getItem('wheelspa_installers');
-    const allInstallers = storedInstallers ? JSON.parse(storedInstallers) : INSTALLERS;
-    setInstallers(allInstallers);
-    setFilteredInstallers(allInstallers);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [instRes, payRes] = await Promise.all([
+        fetch(`${API_URL}/api/installers`, { headers: { 'Authorization': `Bearer ${admin?.token}` } }),
+        fetch(`${API_URL}/api/installer-payments`, { headers: { 'Authorization': `Bearer ${admin?.token}` } })
+      ]);
 
-    const storedPayments = localStorage.getItem('wheelspa_installer_payments');
-    setPayments(storedPayments ? JSON.parse(storedPayments) : MOCK_INSTALLER_PAYMENTS);
+      if (instRes.ok) {
+        const instData = await instRes.json();
+        setInstallers(instData);
+        setFilteredInstallers(instData);
+      } else {
+        setInstallers(DEFAULT_INSTALLERS);
+        setFilteredInstallers(DEFAULT_INSTALLERS);
+      }
+
+      if (payRes.ok) {
+        const payData = await payRes.json();
+        setPayments(payData);
+      }
+    } catch (error) {
+      console.error('Error fetching installer data:', error);
+      toast.error('Connection error loading installers');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -99,63 +125,143 @@ const InstallerManage = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleAddSave = () => {
+  const handleAddSave = async () => {
     if (!formData.name.trim() || !formData.category || !formData.phone.trim()) {
       toast.error('Please fill all fields');
       return;
     }
 
-    const newInstaller = {
-      id: Date.now().toString(),
+    const payload = {
       name: formData.name.trim(),
       category: formData.category,
       phone: formData.phone.trim()
     };
 
-    const updatedInstallers = [...installers, newInstaller];
-    localStorage.setItem('wheelspa_installers', JSON.stringify(updatedInstallers));
-    setInstallers(updatedInstallers);
-    setIsAddModalOpen(false);
-    toast.success('Installer added successfully!');
+    try {
+      const response = await fetch(`${API_URL}/api/installers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        toast.success('Installer added successfully!');
+        setIsAddModalOpen(false);
+        loadData();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Failed to add installer');
+      }
+    } catch (error) {
+      console.error('Error adding installer:', error);
+      toast.error('Connection error adding installer');
+    }
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (!formData.name.trim() || !formData.category || !formData.phone.trim()) {
       toast.error('Please fill all fields');
       return;
     }
 
-    const updatedInstallers = installers.map(i => 
-      i.id === selectedInstaller.id 
-        ? { ...i, name: formData.name.trim(), category: formData.category, phone: formData.phone.trim() }
-        : i
-    );
+    const updatedData = {
+      name: formData.name.trim(),
+      category: formData.category,
+      phone: formData.phone.trim()
+    };
 
-    localStorage.setItem('wheelspa_installers', JSON.stringify(updatedInstallers));
-    setInstallers(updatedInstallers);
-    setIsEditModalOpen(false);
-    toast.success('Installer updated successfully!');
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'edit',
+            data_type: 'installer',
+            data_id: selectedInstaller.id,
+            original_data: selectedInstaller,
+            new_data: { ...selectedInstaller, ...updatedData },
+            notes: `Update installer ${formData.name}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for installer edit');
+          setIsEditModalOpen(false);
+        } else {
+          toast.error('Failed to submit approval request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/installers/${selectedInstaller.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify(updatedData)
+        });
+        if (response.ok) {
+          toast.success('Installer updated successfully!');
+          setIsEditModalOpen(false);
+          loadData();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to update installer');
+        }
+      }
+    } catch (error) {
+      console.error('Error updating installer:', error);
+      toast.error('Connection error updating installer');
+    }
   };
 
-  const handleDeleteConfirm = () => {
-    // Delete installer
-    const updatedInstallers = installers.filter(i => i.id !== selectedInstaller.id);
-    localStorage.setItem('wheelspa_installers', JSON.stringify(updatedInstallers));
-    setInstallers(updatedInstallers);
-
-    // If deleteWithPayments is checked, also delete associated payments
-    if (deleteWithPayments && installerPaymentCount > 0) {
-      const updatedPayments = payments.filter(p => p.installerId !== selectedInstaller.id);
-      localStorage.setItem('wheelspa_installer_payments', JSON.stringify(updatedPayments));
-      setPayments(updatedPayments);
-      toast.success(`Installer and ${installerPaymentCount} payment(s) deleted successfully`);
-    } else {
-      toast.success('Installer deleted successfully');
+  const handleDeleteConfirm = async () => {
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'delete',
+            data_type: 'installer',
+            data_id: selectedInstaller.id,
+            original_data: selectedInstaller,
+            notes: `Delete installer ${selectedInstaller.name}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for installer deletion');
+        } else {
+          toast.error('Failed to submit deletion request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/installers/${selectedInstaller.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${admin?.token}` }
+        });
+        if (response.ok) {
+          toast.success('Installer deleted successfully');
+          loadData();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to delete installer');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting installer:', error);
+      toast.error('Connection error deleting installer');
+    } finally {
+      setIsDeleteModalOpen(false);
+      setSelectedInstaller(null);
+      setDeleteWithPayments(false);
     }
-
-    setIsDeleteModalOpen(false);
-    setSelectedInstaller(null);
-    setDeleteWithPayments(false);
   };
 
   return (

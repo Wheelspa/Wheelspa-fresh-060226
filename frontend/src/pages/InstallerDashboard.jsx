@@ -8,10 +8,16 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { MOCK_INSTALLER_PAYMENTS, INSTALLER_CATEGORIES } from '../data/installerMock';
+import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const InstallerDashboard = () => {
+  const { admin } = useAdminAuth();
   const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalPayable: 0,
     totalPaid: 0,
@@ -20,11 +26,38 @@ const InstallerDashboard = () => {
   });
 
   useEffect(() => {
-    const storedPayments = localStorage.getItem('wheelspa_installer_payments');
-    const allPayments = storedPayments ? JSON.parse(storedPayments) : MOCK_INSTALLER_PAYMENTS;
-    setPayments(allPayments);
-    calculateStats(allPayments);
-  }, []);
+    if (admin?.token) {
+      fetchPayments();
+    }
+  }, [admin?.token]);
+
+  const fetchPayments = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/installer-payments`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(p => ({
+          ...p,
+          installerName: p.installerName || p.installer_name || 'Installer',
+          totalPayable: parseFloat(p.totalPayable) || 0,
+          advancePaid: parseFloat(p.advancePaid) || 0,
+          remainingBalance: parseFloat(p.remainingBalance) || 0
+        }));
+        setPayments(normalized);
+        calculateStats(normalized);
+      } else {
+        toast.error('Failed to load installer payments');
+      }
+    } catch (error) {
+      console.error('Error fetching installer payments:', error);
+      toast.error('Connection error loading installer dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const calculateStats = (paymentData) => {
     const totalPayable = paymentData.reduce((sum, p) => sum + p.totalPayable, 0);

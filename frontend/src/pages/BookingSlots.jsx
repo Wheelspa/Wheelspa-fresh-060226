@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, ChevronLeft, ChevronRight, Clock, User, Car, 
-  CreditCard, CheckCircle, AlertCircle, Phone, DollarSign
+  CreditCard, CheckCircle, AlertCircle, Phone
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';

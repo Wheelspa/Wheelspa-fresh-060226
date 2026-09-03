@@ -117,6 +117,37 @@ export const AdminAuthProvider = ({ children }) => {
     }
   };
 
+  const changePassword = async (oldPassword, newPassword) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.detail || 'Failed to change password' };
+      }
+      
+      const updatedUser = { ...admin, must_change_password: false };
+      localStorage.setItem('wheelspa_admin', JSON.stringify({
+        id: admin.id,
+        username: admin.username,
+        role: admin.role,
+        name: admin.name,
+        must_change_password: false
+      }));
+      setAdmin(updatedUser);
+      return { success: true };
+    } catch (error) {
+      console.error('Change password error:', error);
+      return { success: false, error: 'Connection error. Please try again.' };
+    }
+  };
+
   return (
     <AdminAuthContext.Provider value={{ 
       isAuthenticated, 
@@ -128,7 +159,8 @@ export const AdminAuthProvider = ({ children }) => {
       canEditDirectly,
       canManageUsers,
       canApproveRequests,
-      refreshPendingApprovals
+      refreshPendingApprovals,
+      changePassword
     }}>
       {children}
     </AdminAuthContext.Provider>

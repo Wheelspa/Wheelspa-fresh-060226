@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MapPin, Facebook, Clock, MessageCircle } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, MessageCircle } from 'lucide-react';
 import { BRAND_INFO, SERVICES } from '../../data/mock';
 
 const Footer = () => {
@@ -25,9 +25,23 @@ const Footer = () => {
                 href={BRAND_INFO.social.facebook}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-green-500 transition-colors"
+                aria-label="Facebook"
+                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-green-500 transition-colors text-white"
               >
-                <Facebook className="h-5 w-5" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                </svg>
               </a>
             </div>
           </div>

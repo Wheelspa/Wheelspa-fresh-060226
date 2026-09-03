@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, IndianRupee, Calendar, TrendingUp, 
-  Download, Filter, PieChart, Users
+  Download, PieChart, Users
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { MOCK_ENTRIES, PAYMENT_MODES, STAFF_MEMBERS } from '../data/adminMock';
 import { SERVICES } from '../data/mock';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const AdminReports = () => {
+  const { admin } = useAdminAuth();
   const [entries, setEntries] = useState([]);
   const [dateRange, setDateRange] = useState('today');
+  const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState({
     totalCollection: 0,
     cashCollection: 0,
@@ -27,10 +32,42 @@ const AdminReports = () => {
   });
 
   useEffect(() => {
-    const storedEntries = localStorage.getItem('wheelspa_entries');
-    const allEntries = storedEntries ? JSON.parse(storedEntries) : MOCK_ENTRIES;
-    setEntries(allEntries);
-  }, []);
+    if (admin?.token) {
+      loadEntries();
+    }
+  }, [admin?.token]);
+
+  const loadEntries = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/entries`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(e => ({
+          ...e,
+          customerName: e.customerName || e.customer_name || 'Customer',
+          carNumber: e.carNumber || e.car_number || 'N/A',
+          mobileNumber: e.mobileNumber || e.mobile_number || 'N/A',
+          serviceType: e.serviceType || e.service_type || 'detailing',
+          amount: parseFloat(e.amount) || 0,
+          paymentMode: e.paymentMode || e.payment_mode || 'cash',
+          receivedBy: e.receivedBy || e.received_by || 'Staff',
+          jobStatus: e.jobStatus || e.job_status || 'pending',
+          entryDate: e.entryDate || e.created_at || new Date().toISOString()
+        }));
+        setEntries(normalized);
+      } else {
+        toast.error('Failed to load report data from server');
+      }
+    } catch (error) {
+      console.error('Error fetching entries for reports:', error);
+      toast.error('Connection error loading reports');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     calculateReports();

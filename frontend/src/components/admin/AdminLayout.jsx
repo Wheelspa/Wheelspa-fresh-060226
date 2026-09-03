@@ -7,14 +7,48 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { BRAND_INFO } from '../../data/mock';
+import { toast } from 'sonner';
 
 const AdminLayout = ({ children, title }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { admin, logout, pendingApprovals, canApproveRequests, canManageUsers } = useAdminAuth();
+  const { admin, logout, pendingApprovals, canApproveRequests, canManageUsers, changePassword } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters long');
+      return;
+    }
+
+    setPasswordLoading(true);
+    const result = await changePassword(oldPassword, newPassword);
+    setPasswordLoading(false);
+
+    if (result.success) {
+      toast.success('Password updated successfully!');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -285,6 +319,66 @@ const AdminLayout = ({ children, title }) => {
           {children}
         </main>
       </div>
+
+      {/* Forced Password Change Modal */}
+      <Dialog open={!!admin?.must_change_password} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              Password Change Required
+            </DialogTitle>
+            <DialogDescription>
+              Your account requires a password update before accessing the admin dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="oldPass">Current Password</Label>
+              <Input
+                id="oldPass"
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="Enter current password (e.g. owner123)"
+                required
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="newPass">New Password</Label>
+              <Input
+                id="newPass"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                required
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="confirmPass">Confirm New Password</Label>
+              <Input
+                id="confirmPass"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                required
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={handleLogout}>
+                Logout
+              </Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={passwordLoading}>
+                {passwordLoading ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

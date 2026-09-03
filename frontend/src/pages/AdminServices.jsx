@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Edit, Trash2, Search, Shield, Sparkles, Droplets, 
-  Car, Lightbulb, Cog, Sofa, Atom, Save, X, GripVertical
+  Car, Lightbulb, Cog, Sofa, Atom, Save, X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,8 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { SERVICES } from '../data/mock';
 import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const ICON_OPTIONS = [
   { value: 'Shield', label: 'Shield', icon: Shield },
@@ -26,10 +29,129 @@ const ICON_OPTIONS = [
   { value: 'Atom', label: 'Atom/Tech', icon: Atom },
 ];
 
+const ServiceForm = ({ formData, setFormData, errors }) => (
+  <div className="space-y-4">
+    <div className="grid md:grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="name">Service Name *</Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          className={`mt-1 ${errors.name ? 'border-red-500' : ''}`}
+          placeholder="e.g., Paint Protection Film (PPF)"
+        />
+        {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+      </div>
+      <div>
+        <Label htmlFor="shortName">Short Name *</Label>
+        <Input
+          id="shortName"
+          value={formData.shortName}
+          onChange={(e) => setFormData(prev => ({ ...prev, shortName: e.target.value }))}
+          className={`mt-1 ${errors.shortName ? 'border-red-500' : ''}`}
+          placeholder="e.g., PPF"
+        />
+        {errors.shortName && <p className="text-red-500 text-sm mt-1">{errors.shortName}</p>}
+      </div>
+    </div>
+
+    <div>
+      <Label htmlFor="description">Description *</Label>
+      <Textarea
+        id="description"
+        value={formData.description}
+        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+        className={`mt-1 ${errors.description ? 'border-red-500' : ''}`}
+        placeholder="Describe the service..."
+        rows={3}
+      />
+      {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
+    </div>
+
+    <div>
+      <Label htmlFor="benefits">Benefits * (comma separated)</Label>
+      <Textarea
+        id="benefits"
+        value={formData.benefits}
+        onChange={(e) => setFormData(prev => ({ ...prev, benefits: e.target.value }))}
+        className={`mt-1 ${errors.benefits ? 'border-red-500' : ''}`}
+        placeholder="e.g., Self-healing technology, 10+ years protection, UV protection"
+        rows={2}
+      />
+      {errors.benefits && <p className="text-red-500 text-sm mt-1">{errors.benefits}</p>}
+    </div>
+
+    <div>
+      <Label htmlFor="suitableFor">Suitable For * (comma separated)</Label>
+      <Input
+        id="suitableFor"
+        value={formData.suitableFor}
+        onChange={(e) => setFormData(prev => ({ ...prev, suitableFor: e.target.value }))}
+        className={`mt-1 ${errors.suitableFor ? 'border-red-500' : ''}`}
+        placeholder="e.g., Luxury Cars, Sports Cars, New Vehicles"
+      />
+      {errors.suitableFor && <p className="text-red-500 text-sm mt-1">{errors.suitableFor}</p>}
+    </div>
+
+    <div className="grid md:grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="image">Image URL</Label>
+        <Input
+          id="image"
+          value={formData.image}
+          onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
+          className="mt-1"
+          placeholder="https://example.com/image.jpg"
+        />
+        <p className="text-xs text-gray-500 mt-1">Leave empty for default image</p>
+      </div>
+      <div>
+        <Label>Icon</Label>
+        <Select
+          value={formData.icon}
+          onValueChange={(value) => setFormData(prev => ({ ...prev, icon: value }))}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ICON_OPTIONS.map((option) => {
+              const IconComp = option.icon;
+              return (
+                <SelectItem key={option.value} value={option.value}>
+                  <div className="flex items-center space-x-2">
+                    <IconComp className="h-4 w-4" />
+                    <span>{option.label}</span>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    {formData.image && (
+      <div>
+        <Label>Image Preview</Label>
+        <img
+          src={formData.image}
+          alt="Preview"
+          className="mt-2 h-32 w-full object-cover rounded-lg border"
+          onError={(e) => e.target.style.display = 'none'}
+        />
+      </div>
+    )}
+  </div>
+);
+
 const AdminServices = () => {
+  const { admin } = useAdminAuth();
   const [services, setServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -51,15 +173,29 @@ const AdminServices = () => {
     loadServices();
   }, []);
 
-  const loadServices = () => {
-    const storedServices = localStorage.getItem('wheelspa_services');
-    const allServices = storedServices ? JSON.parse(storedServices) : SERVICES;
-    setServices(allServices);
-    setFilteredServices(allServices);
-    
-    // Save default services to localStorage if not exists
-    if (!storedServices) {
-      localStorage.setItem('wheelspa_services', JSON.stringify(SERVICES));
+  const loadServices = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/services`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setServices(data);
+          setFilteredServices(data);
+        } else {
+          setServices(SERVICES);
+          setFilteredServices(SERVICES);
+        }
+      } else {
+        setServices(SERVICES);
+        setFilteredServices(SERVICES);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      setServices(SERVICES);
+      setFilteredServices(SERVICES);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,11 +264,10 @@ const AdminServices = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleAddSave = () => {
+  const handleAddSave = async () => {
     if (!validateForm()) return;
 
     const newService = {
-      id: formData.shortName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
       name: formData.name.trim(),
       shortName: formData.shortName.trim(),
       description: formData.description.trim(),
@@ -142,163 +277,132 @@ const AdminServices = () => {
       icon: formData.icon
     };
 
-    const updatedServices = [...services, newService];
-    localStorage.setItem('wheelspa_services', JSON.stringify(updatedServices));
-    setServices(updatedServices);
-    setIsAddModalOpen(false);
-    resetForm();
-    toast.success('Service added successfully!');
+    try {
+      const response = await fetch(`${API_URL}/api/services`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify(newService)
+      });
+      if (response.ok) {
+        toast.success('Service added successfully!');
+        setIsAddModalOpen(false);
+        resetForm();
+        loadServices();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Failed to add service');
+      }
+    } catch (error) {
+      console.error('Error adding service:', error);
+      toast.error('Connection error adding service');
+    }
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (!validateForm()) return;
 
-    const updatedServices = services.map(s => {
-      if (s.id === selectedService.id) {
-        return {
-          ...s,
-          name: formData.name.trim(),
-          shortName: formData.shortName.trim(),
-          description: formData.description.trim(),
-          benefits: formData.benefits.split(',').map(b => b.trim()).filter(b => b),
-          suitableFor: formData.suitableFor.split(',').map(st => st.trim()).filter(st => st),
-          image: formData.image.trim() || s.image,
-          icon: formData.icon
-        };
+    const updatedData = {
+      name: formData.name.trim(),
+      shortName: formData.shortName.trim(),
+      description: formData.description.trim(),
+      benefits: formData.benefits.split(',').map(b => b.trim()).filter(b => b),
+      suitableFor: formData.suitableFor.split(',').map(st => st.trim()).filter(st => st),
+      image: formData.image.trim() || selectedService.image,
+      icon: formData.icon
+    };
+
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'edit',
+            data_type: 'service',
+            data_id: selectedService.id,
+            original_data: selectedService,
+            new_data: updatedData,
+            notes: `Edit service ${formData.shortName}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for service edit');
+          setIsEditModalOpen(false);
+        } else {
+          toast.error('Failed to submit approval request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/services/${selectedService.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify(updatedData)
+        });
+        if (response.ok) {
+          toast.success('Service updated successfully!');
+          setIsEditModalOpen(false);
+          loadServices();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to update service');
+        }
       }
-      return s;
-    });
-
-    localStorage.setItem('wheelspa_services', JSON.stringify(updatedServices));
-    setServices(updatedServices);
-    setIsEditModalOpen(false);
-    toast.success('Service updated successfully!');
+    } catch (error) {
+      console.error('Error updating service:', error);
+      toast.error('Connection error updating service');
+    }
   };
 
-  const handleDeleteConfirm = () => {
-    const updatedServices = services.filter(s => s.id !== selectedService.id);
-    localStorage.setItem('wheelspa_services', JSON.stringify(updatedServices));
-    setServices(updatedServices);
-    setIsDeleteModalOpen(false);
-    toast.success('Service deleted successfully!');
+  const handleDeleteConfirm = async () => {
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'delete',
+            data_type: 'service',
+            data_id: selectedService.id,
+            original_data: selectedService,
+            notes: `Delete service ${selectedService.name}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for service deletion');
+        } else {
+          toast.error('Failed to submit deletion request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/services/${selectedService.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${admin?.token}` }
+        });
+        if (response.ok) {
+          toast.success('Service deleted successfully!');
+          loadServices();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to delete service');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      toast.error('Connection error deleting service');
+    } finally {
+      setIsDeleteModalOpen(false);
+    }
   };
-
-  const ServiceForm = ({ onSave, onCancel, title }) => (
-    <div className="space-y-4">
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="name">Service Name *</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className={`mt-1 ${errors.name ? 'border-red-500' : ''}`}
-            placeholder="e.g., Paint Protection Film (PPF)"
-          />
-          {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
-        </div>
-        <div>
-          <Label htmlFor="shortName">Short Name *</Label>
-          <Input
-            id="shortName"
-            value={formData.shortName}
-            onChange={(e) => setFormData(prev => ({ ...prev, shortName: e.target.value }))}
-            className={`mt-1 ${errors.shortName ? 'border-red-500' : ''}`}
-            placeholder="e.g., PPF"
-          />
-          {errors.shortName && <p className="text-red-500 text-sm mt-1">{errors.shortName}</p>}
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description *</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          className={`mt-1 ${errors.description ? 'border-red-500' : ''}`}
-          placeholder="Describe the service..."
-          rows={3}
-        />
-        {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="benefits">Benefits * (comma separated)</Label>
-        <Textarea
-          id="benefits"
-          value={formData.benefits}
-          onChange={(e) => setFormData(prev => ({ ...prev, benefits: e.target.value }))}
-          className={`mt-1 ${errors.benefits ? 'border-red-500' : ''}`}
-          placeholder="e.g., Self-healing technology, 10+ years protection, UV protection"
-          rows={2}
-        />
-        {errors.benefits && <p className="text-red-500 text-sm mt-1">{errors.benefits}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="suitableFor">Suitable For * (comma separated)</Label>
-        <Input
-          id="suitableFor"
-          value={formData.suitableFor}
-          onChange={(e) => setFormData(prev => ({ ...prev, suitableFor: e.target.value }))}
-          className={`mt-1 ${errors.suitableFor ? 'border-red-500' : ''}`}
-          placeholder="e.g., Luxury Cars, Sports Cars, New Vehicles"
-        />
-        {errors.suitableFor && <p className="text-red-500 text-sm mt-1">{errors.suitableFor}</p>}
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="image">Image URL</Label>
-          <Input
-            id="image"
-            value={formData.image}
-            onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
-            className="mt-1"
-            placeholder="https://example.com/image.jpg"
-          />
-          <p className="text-xs text-gray-500 mt-1">Leave empty for default image</p>
-        </div>
-        <div>
-          <Label>Icon</Label>
-          <Select
-            value={formData.icon}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, icon: value }))}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ICON_OPTIONS.map((option) => {
-                const IconComp = option.icon;
-                return (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex items-center space-x-2">
-                      <IconComp className="h-4 w-4" />
-                      <span>{option.label}</span>
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {formData.image && (
-        <div>
-          <Label>Image Preview</Label>
-          <img
-            src={formData.image}
-            alt="Preview"
-            className="mt-2 h-32 w-full object-cover rounded-lg border"
-            onError={(e) => e.target.style.display = 'none'}
-          />
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <AdminLayout title="Manage Services">
@@ -404,7 +508,7 @@ const AdminServices = () => {
               Add New Service
             </DialogTitle>
           </DialogHeader>
-          <ServiceForm />
+          <ServiceForm formData={formData} setFormData={setFormData} errors={errors} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
             <Button onClick={handleAddSave} className="bg-green-500 hover:bg-green-600 text-white">
@@ -424,7 +528,7 @@ const AdminServices = () => {
               Edit Service
             </DialogTitle>
           </DialogHeader>
-          <ServiceForm />
+          <ServiceForm formData={formData} setFormData={setFormData} errors={errors} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
             <Button onClick={handleEditSave} className="bg-green-500 hover:bg-green-600 text-white">

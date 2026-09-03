@@ -11,18 +11,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { 
   INSTALLER_CATEGORIES, 
   INSTALLER_PAYMENT_MODES, 
-  INSTALLERS,
+  INSTALLERS as DEFAULT_INSTALLERS,
   MOCK_INSTALLER_PAYMENTS 
 } from '../data/installerMock';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const InstallerNewPayment = () => {
   const navigate = useNavigate();
+  const { admin } = useAdminAuth();
+  const [installers, setInstallers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filteredInstallers, setFilteredInstallers] = useState(INSTALLERS);
+  const [filteredInstallers, setFilteredInstallers] = useState([]);
   const [formData, setFormData] = useState({
     category: '',
     installerId: '',
@@ -38,17 +43,47 @@ const InstallerNewPayment = () => {
   });
   const [errors, setErrors] = useState({});
 
+  useEffect(() => {
+    if (admin?.token) {
+      loadInstallers();
+    }
+  }, [admin?.token]);
+
+  const loadInstallers = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/installers`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setInstallers(data);
+          setFilteredInstallers(data);
+        } else {
+          setInstallers(DEFAULT_INSTALLERS);
+          setFilteredInstallers(DEFAULT_INSTALLERS);
+        }
+      } else {
+        setInstallers(DEFAULT_INSTALLERS);
+        setFilteredInstallers(DEFAULT_INSTALLERS);
+      }
+    } catch (error) {
+      console.error('Error fetching installers:', error);
+      setInstallers(DEFAULT_INSTALLERS);
+      setFilteredInstallers(DEFAULT_INSTALLERS);
+    }
+  };
+
   // Filter installers based on selected category
   useEffect(() => {
     if (formData.category) {
-      const filtered = INSTALLERS.filter(i => i.category === formData.category);
+      const filtered = installers.filter(i => i.category === formData.category);
       setFilteredInstallers(filtered);
-      // Reset installer selection when category changes
       setFormData(prev => ({ ...prev, installerId: '', installerName: '' }));
     } else {
-      setFilteredInstallers(INSTALLERS);
+      setFilteredInstallers(installers);
     }
-  }, [formData.category]);
+  }, [formData.category, installers]);
 
   // Auto-calculate remaining balance
   useEffect(() => {
@@ -60,7 +95,7 @@ const InstallerNewPayment = () => {
 
   const handleInputChange = (field, value) => {
     if (field === 'installerId') {
-      const installer = INSTALLERS.find(i => i.id === value);
+      const installer = installers.find(i => i.id === value);
       setFormData(prev => ({
         ...prev,
         installerId: value,
@@ -102,31 +137,44 @@ const InstallerNewPayment = () => {
 
     setIsSubmitting(true);
 
-    const newPayment = {
-      id: Date.now().toString(),
-      ...formData,
+    const payload = {
+      category: formData.category,
+      installerId: formData.installerId,
+      installerName: formData.installerName,
+      jobReference: formData.jobReference,
       totalPayable: parseFloat(formData.totalPayable),
       advancePaid: parseFloat(formData.advancePaid),
       remainingBalance: formData.remainingBalance,
-      status: formData.remainingBalance === 0 ? 'completed' : 'partial',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      auditTrail: [
-        { action: 'created', timestamp: new Date().toISOString(), by: 'admin' }
-      ]
+      paymentMode: formData.paymentMode,
+      transactionId: formData.transactionId || '',
+      paymentDate: formData.paymentDate,
+      notes: formData.notes || '',
+      status: formData.remainingBalance === 0 ? 'completed' : 'partial'
     };
 
-    // Save to localStorage
-    const storedPayments = localStorage.getItem('wheelspa_installer_payments');
-    const payments = storedPayments ? JSON.parse(storedPayments) : MOCK_INSTALLER_PAYMENTS;
-    payments.push(newPayment);
-    localStorage.setItem('wheelspa_installer_payments', JSON.stringify(payments));
+    try {
+      const response = await fetch(`${API_URL}/api/installer-payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify(payload)
+      });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    setIsSubmitting(false);
-    toast.success('Payment entry added successfully!');
-    navigate('/admin/installer');
+      if (response.ok) {
+        toast.success('Payment entry added successfully!');
+        navigate('/admin/installer');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Failed to create payment entry');
+      }
+    } catch (error) {
+      console.error('Error adding installer payment:', error);
+      toast.error('Connection error submitting payment entry');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

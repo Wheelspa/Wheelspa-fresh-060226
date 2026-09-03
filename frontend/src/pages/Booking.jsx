@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import Layout from '../components/layout/Layout';
 import { SERVICES as DEFAULT_SERVICES, CAR_BRANDS, BRAND_INFO } from '../data/mock';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -126,7 +127,6 @@ const Booking = () => {
 
     // Save to backend API
     try {
-      const API_URL = process.env.REACT_APP_BACKEND_URL;
       const response = await fetch(`${API_URL}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,18 +136,15 @@ const Booking = () => {
       if (!response.ok) {
         throw new Error('Failed to save booking');
       }
+
+      setBookingId(newBookingId);
+      setIsSubmitted(true);
     } catch (error) {
-      console.error('Error saving to backend:', error);
-      // Fallback: Save to localStorage
-      const storedBookings = localStorage.getItem('wheelspa_bookings');
-      const bookings = storedBookings ? JSON.parse(storedBookings) : [];
-      bookings.push(newBooking);
-      localStorage.setItem('wheelspa_bookings', JSON.stringify(bookings));
+      console.error('Error saving booking:', error);
+      toast.error("Something went wrong, please try again or contact us on WhatsApp");
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setBookingId(newBookingId);
-    setIsSubmitting(false);
-    setIsSubmitted(true);
   };
 
   if (isSubmitted) {

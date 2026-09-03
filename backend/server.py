@@ -62,6 +62,7 @@ class UserResponse(BaseModel):
     name: str
     created_at: str
     is_active: bool = True
+    must_change_password: bool = False
 
 class ApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -90,6 +91,18 @@ class ApprovalRequestCreate(BaseModel):
 class ApprovalAction(BaseModel):
     action: str  # approve, reject
     notes: Optional[str] = None
+
+class ContactEnquiryCreate(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = ""
+    enquiry_type: Optional[str] = ""
+    subject: Optional[str] = ""
+    message: str
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str
 
 # ============== HELPER FUNCTIONS ==============
 
@@ -148,7 +161,8 @@ async def login(user_data: UserLogin):
             "id": user["id"],
             "username": user["username"],
             "role": user["role"],
-            "name": user["name"]
+            "name": user["name"],
+            "must_change_password": user.get("must_change_password", False)
         }
     }
 
@@ -158,8 +172,23 @@ async def get_me(user: dict = Depends(get_current_user)):
         "id": user["id"],
         "username": user["username"],
         "role": user["role"],
-        "name": user["name"]
+        "name": user["name"],
+        "must_change_password": user.get("must_change_password", False)
     }
+
+@api_router.post("/auth/change-password")
+async def change_password(data: PasswordChange, current_user: dict = Depends(get_current_user)):
+    if not verify_password(data.old_password, current_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long")
+    
+    new_hash = get_password_hash(data.new_password)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"password_hash": new_hash, "must_change_password": False}}
+    )
+    return {"message": "Password updated successfully"}
 
 # ============== USER MANAGEMENT (Owner Only) ==============
 
@@ -336,6 +365,23 @@ async def process_approval_request(
     return {"message": f"Request {action_data.action}d successfully"}
 
 # ============== DATA ROUTES (with role-based access) ==============
+
+# Contact Enquiries
+@api_router.post("/contact")
+async def create_contact_enquiry(enquiry: ContactEnquiryCreate):
+    enquiry_doc = {
+        "id": str(uuid.uuid4()),
+        "name": enquiry.name,
+        "phone": enquiry.phone,
+        "email": enquiry.email or "",
+        "enquiry_type": enquiry.enquiry_type or "",
+        "subject": enquiry.subject or "",
+        "message": enquiry.message,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.contact_enquiries.insert_one(enquiry_doc)
+    enquiry_doc.pop("_id", None)
+    return enquiry_doc
 
 # Bookings
 @api_router.get("/bookings")
@@ -590,8 +636,6 @@ async def call_next_token(current_user: dict = Depends(get_current_user)):
         return {"message": f"Now serving token {next_token['token_display']}", "token": next_token}
     
     return {"message": "No more tokens in queue", "token": None}
-    entry.pop("_id", None)
-    return entry
 
 @api_router.put("/entries/{entry_id}")
 async def update_entry(entry_id: str, entry_data: dict, current_user: dict = Depends(get_current_user)):
@@ -940,7 +984,8 @@ async def seed_owner():
             "role": "owner",
             "name": "System Owner",
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "is_active": True
+            "is_active": True,
+            "must_change_password": True
         }
         await db.users.insert_one(owner_doc)
         logger.info("Default owner account created: owner / owner123")

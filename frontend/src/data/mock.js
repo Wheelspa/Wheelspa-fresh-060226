@@ -4,7 +4,7 @@ export const BRAND_INFO = {
   name: "Wheelspa",
   tagline: "Pamper Your Car",
   logo: "/logo-transparent.png",
-  mascot: "https://customer-assets.emergentagent.com/job_detailing-pro-11/artifacts/g4mul2jq_PHOTO-2025-02-07-16-19-58%202.png",
+  mascot: "/logo-transparent.png",
   phones: ["70226-70226", "777-007-3535"],
   whatsapp: "7770073535",
   email: "info@wheelspa.in",

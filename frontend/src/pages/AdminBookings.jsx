@@ -18,44 +18,150 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const AdminBookings = () => {
+  const { admin } = useAdminAuth();
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadBookings();
-  }, []);
+    if (admin?.token) {
+      loadBookings();
+    }
+  }, [admin?.token]);
 
-  const loadBookings = () => {
-    const storedBookings = localStorage.getItem('wheelspa_bookings');
-    if (storedBookings) {
-      const parsed = JSON.parse(storedBookings);
-      // Sort by createdAt descending (newest first)
-      parsed.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setBookings(parsed);
+  const normalizeBooking = (b) => ({
+    ...b,
+    customerName: b.customerName || b.customer_name || 'Customer',
+    phone: b.phone || 'N/A',
+    email: b.email || '',
+    serviceName: b.serviceName || b.service || 'Detailing Service',
+    carBrand: b.carBrand || '',
+    carModel: b.carModel || '',
+    appointmentDate: b.appointmentDate || b.appointment_date || '',
+    timeSlot: b.timeSlot || b.time_slot || '',
+    status: b.status || 'pending',
+    createdAt: b.created_at || b.createdAt || new Date().toISOString()
+  });
+
+  const loadBookings = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/bookings`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(normalizeBooking);
+        normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setBookings(normalized);
+      } else {
+        toast.error('Failed to load bookings from server');
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      toast.error('Connection error loading bookings');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateBookingStatus = (bookingId, newStatus) => {
-    const updatedBookings = bookings.map(b => 
-      b.id === bookingId ? { ...b, status: newStatus } : b
-    );
-    setBookings(updatedBookings);
-    localStorage.setItem('wheelspa_bookings', JSON.stringify(updatedBookings));
-    toast.success(`Booking status updated to ${newStatus}`);
+  const updateBookingStatus = async (bookingId, newStatus) => {
+    try {
+      if (admin?.role === 'admin') {
+        // Submit approval request for admin
+        const targetBooking = bookings.find(b => b.id === bookingId);
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'edit',
+            data_type: 'booking',
+            data_id: bookingId,
+            original_data: targetBooking,
+            new_data: { ...targetBooking, status: newStatus },
+            notes: `Status update to ${newStatus}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted to update status');
+        } else {
+          toast.error('Failed to submit approval request');
+        }
+      } else {
+        // Direct update for superadmin/owner
+        const response = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (response.ok) {
+          toast.success(`Booking status updated to ${newStatus}`);
+          loadBookings();
+        } else {
+          toast.error('Failed to update booking status');
+        }
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Connection error updating status');
+    }
   };
 
-  const deleteBooking = (bookingId) => {
-    if (window.confirm('Are you sure you want to delete this booking?')) {
-      const updatedBookings = bookings.filter(b => b.id !== bookingId);
-      setBookings(updatedBookings);
-      localStorage.setItem('wheelspa_bookings', JSON.stringify(updatedBookings));
-      toast.success('Booking deleted successfully');
+  const deleteBooking = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to delete this booking?')) return;
+
+    try {
+      if (admin?.role === 'admin') {
+        const targetBooking = bookings.find(b => b.id === bookingId);
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'delete',
+            data_type: 'booking',
+            data_id: bookingId,
+            original_data: targetBooking,
+            notes: 'Delete booking'
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for deletion');
+        } else {
+          toast.error('Failed to submit deletion request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${admin?.token}` }
+        });
+        if (response.ok) {
+          toast.success('Booking deleted successfully');
+          loadBookings();
+        } else {
+          toast.error('Failed to delete booking');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+      toast.error('Connection error deleting booking');
     }
   };
 

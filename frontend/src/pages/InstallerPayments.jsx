@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Search, Filter, Plus, Edit, Trash2, Eye, Calendar,
+  Search, Plus, Edit, Trash2, Eye, Calendar,
   Download, RefreshCw, IndianRupee, FileText, X, Printer
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import AdminLayout from '../components/admin/AdminLayout';
+import { useAdminAuth } from '../context/AdminAuthContext';
 import InstallerReceipt from '../components/InstallerReceipt';
 import { 
   MOCK_INSTALLER_PAYMENTS, 
@@ -23,7 +24,10 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const InstallerPayments = () => {
+  const { admin } = useAdminAuth();
   const [payments, setPayments] = useState([]);
   const [filteredPayments, setFilteredPayments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +36,7 @@ const InstallerPayments = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [loading, setLoading] = useState(true);
   
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -49,14 +54,38 @@ const InstallerPayments = () => {
   });
 
   useEffect(() => {
-    loadPayments();
-  }, []);
+    if (admin?.token) {
+      loadPayments();
+    }
+  }, [admin?.token]);
 
-  const loadPayments = () => {
-    const storedPayments = localStorage.getItem('wheelspa_installer_payments');
-    const allPayments = storedPayments ? JSON.parse(storedPayments) : MOCK_INSTALLER_PAYMENTS;
-    setPayments(allPayments);
-    setFilteredPayments(allPayments);
+  const loadPayments = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/installer-payments`, {
+        headers: { 'Authorization': `Bearer ${admin?.token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map(p => ({
+          ...p,
+          installerName: p.installerName || p.installer_name || 'Installer',
+          totalPayable: parseFloat(p.totalPayable) || 0,
+          advancePaid: parseFloat(p.advancePaid) || 0,
+          remainingBalance: parseFloat(p.remainingBalance) || 0,
+          createdAt: p.created_at || p.createdAt || new Date().toISOString()
+        }));
+        setPayments(normalized);
+        setFilteredPayments(normalized);
+      } else {
+        toast.error('Failed to load installer payments');
+      }
+    } catch (error) {
+      console.error('Error loading installer payments:', error);
+      toast.error('Connection error loading payments');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -221,38 +250,68 @@ const InstallerPayments = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     const newAdvance = parseFloat(editForm.advancePaid);
     if (newAdvance > selectedPayment.totalPayable) {
       toast.error('Advance cannot exceed total payable');
       return;
     }
 
-    const updatedPayments = payments.map(p => {
-      if (p.id === selectedPayment.id) {
-        const newRemaining = selectedPayment.totalPayable - newAdvance;
-        return {
-          ...p,
-          advancePaid: newAdvance,
-          remainingBalance: newRemaining,
-          paymentMode: editForm.paymentMode,
-          transactionId: editForm.transactionId,
-          notes: editForm.notes,
-          status: newRemaining === 0 ? 'completed' : 'partial',
-          updatedAt: new Date().toISOString(),
-          auditTrail: [
-            ...p.auditTrail,
-            { action: 'updated', timestamp: new Date().toISOString(), by: 'admin', changes: `Advance: ₹${newAdvance}` }
-          ]
-        };
-      }
-      return p;
-    });
+    const newRemaining = selectedPayment.totalPayable - newAdvance;
+    const updatedData = {
+      advancePaid: newAdvance,
+      remainingBalance: newRemaining,
+      paymentMode: editForm.paymentMode,
+      transactionId: editForm.transactionId || '',
+      notes: editForm.notes || '',
+      status: newRemaining === 0 ? 'completed' : 'partial'
+    };
 
-    localStorage.setItem('wheelspa_installer_payments', JSON.stringify(updatedPayments));
-    setPayments(updatedPayments);
-    setIsEditModalOpen(false);
-    toast.success('Payment updated successfully!');
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'edit',
+            data_type: 'installer_payment',
+            data_id: selectedPayment.id,
+            original_data: selectedPayment,
+            new_data: { ...selectedPayment, ...updatedData },
+            notes: `Update installer payment for ${selectedPayment.installerName}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for payment update');
+          setIsEditModalOpen(false);
+        } else {
+          toast.error('Failed to submit approval request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/installer-payments/${selectedPayment.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify(updatedData)
+        });
+        if (response.ok) {
+          toast.success('Payment updated successfully!');
+          setIsEditModalOpen(false);
+          loadPayments();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to update payment');
+        }
+      }
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast.error('Connection error updating payment');
+    }
   };
 
   const handleDeleteClick = (payment) => {
@@ -260,12 +319,48 @@ const InstallerPayments = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
-    const updatedPayments = payments.filter(p => p.id !== paymentToDelete.id);
-    localStorage.setItem('wheelspa_installer_payments', JSON.stringify(updatedPayments));
-    setPayments(updatedPayments);
-    setIsDeleteModalOpen(false);
-    toast.success('Payment deleted successfully');
+  const handleDeleteConfirm = async () => {
+    try {
+      if (admin?.role === 'admin') {
+        const response = await fetch(`${API_URL}/api/approval-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${admin?.token}`
+          },
+          body: JSON.stringify({
+            request_type: 'delete',
+            data_type: 'installer_payment',
+            data_id: paymentToDelete.id,
+            original_data: paymentToDelete,
+            notes: `Delete installer payment for ${paymentToDelete.installerName}`
+          })
+        });
+        if (response.ok) {
+          toast.success('Approval request submitted for deletion');
+        } else {
+          toast.error('Failed to submit deletion request');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/api/installer-payments/${paymentToDelete.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${admin?.token}` }
+        });
+        if (response.ok) {
+          toast.success('Payment deleted successfully');
+          loadPayments();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          toast.error(errorData.detail || 'Failed to delete payment');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      toast.error('Connection error deleting payment');
+    } finally {
+      setIsDeleteModalOpen(false);
+      setPaymentToDelete(null);
+    }
   };
 
   const exportToExcel = () => {

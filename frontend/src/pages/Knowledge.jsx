@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Clock, Tag, ChevronDown, ChevronUp, Search, ArrowRight, X } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, Search, ArrowRight, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
