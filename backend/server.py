@@ -114,7 +114,7 @@ class BookingCreate(BaseModel):
     service: str
     serviceName: Optional[str] = None
     carBrand: str
-    carModel: str
+    carModel: Optional[str] = ""
     carNumber: str
     car_number: Optional[str] = None
     appointmentDate: Optional[str] = None

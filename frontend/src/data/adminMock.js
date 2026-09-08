@@ -65,7 +65,7 @@ export const MOCK_ENTRIES = [
     customerName: "Amit Deshmukh",
     carNumber: "MH-12-EF-9012",
     mobileNumber: "7654321098",
-    serviceType: "foam-wash",
+    serviceType: "royal-foam-wash",
     amount: 800,
     paymentMode: "phone_pe",
     receivedBy: "Suresh",

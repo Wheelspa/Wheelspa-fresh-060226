@@ -40,7 +40,17 @@ const Booking = () => {
   useEffect(() => {
     // Load services from localStorage
     const storedServices = localStorage.getItem('wheelspa_services');
-    setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+    if (storedServices) {
+      const parsed = JSON.parse(storedServices);
+      if (parsed.some(s => s.id === 'foam-wash')) {
+        localStorage.removeItem('wheelspa_services');
+        setServices(DEFAULT_SERVICES);
+        return;
+      }
+      setServices(parsed);
+    } else {
+      setServices(DEFAULT_SERVICES);
+    }
   }, []);
 
   // Fetch slots when date changes
@@ -91,7 +101,6 @@ const Booking = () => {
 
     if (!formData.service) newErrors.service = 'Please select a service';
     if (!formData.carBrand) newErrors.carBrand = 'Please select car brand';
-    if (!formData.carModel.trim()) newErrors.carModel = 'Car model is required';
 
     const carNumberRegex = /^[A-Za-z]{2}[\s-]?[0-9]{1,2}[\s-]?[A-Za-z]{0,3}[\s-]?[0-9]{1,4}$/;
     if (!formData.carNumber.trim()) {
@@ -382,7 +391,7 @@ const Booking = () => {
                       {errors.carBrand && <p className="text-red-500 text-sm mt-1">{errors.carBrand}</p>}
                     </div>
                     <div>
-                      <Label htmlFor="carModel">Car Model *</Label>
+                      <Label htmlFor="carModel">Car Model (Optional)</Label>
                       <Input
                         id="carModel"
                         value={formData.carModel}

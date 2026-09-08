@@ -57,14 +57,24 @@ export const SERVICES = [
     icon: "Atom"
   },
   {
-    id: "foam-wash",
-    name: "Foam Wash & Deep Cleaning",
-    shortName: "Foam Wash",
-    description: "Premium foam wash using pH-balanced solutions that gently lift dirt without scratching your precious paint.",
-    benefits: ["Scratch-free cleaning", "pH balanced formula", "Deep dirt removal", "Paint-safe", "Showroom finish"],
+    id: "royal-foam-wash",
+    name: "Royal Foam Wash",
+    shortName: "Royal Wash",
+    description: "Premium foam wash using pH-balanced solutions that gently lift dirt and road grime without scratching your precious paint.",
+    benefits: ["Scratch-free cleaning", "pH balanced formula", "Paint-safe protection", "High-foaming action", "Spot-free shine"],
     suitableFor: ["All Vehicles", "Regular Maintenance", "Pre-coating Prep", "Weekly Care"],
     image: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9",
     icon: "Droplets"
+  },
+  {
+    id: "deep-cleaning",
+    name: "Deep Cleaning",
+    shortName: "Deep Clean",
+    description: "Thorough deep cleaning detailing service that removes stubborn dirt, grime, and contaminants for a pristine showroom finish.",
+    benefits: ["Deep dirt removal", "Showroom finish", "Complete decontamination", "Intensive exterior wash", "Rejuvenated appearance"],
+    suitableFor: ["All Vehicles", "Post-trip Cleanup", "Pre-sale Prep", "Seasonal Deep Clean"],
+    image: "https://images.pexels.com/photos/3764984/pexels-photo-3764984.jpeg",
+    icon: "Sparkles"
   },
   {
     id: "interior",

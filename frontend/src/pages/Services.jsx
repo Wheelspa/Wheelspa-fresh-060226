@@ -26,7 +26,17 @@ const Services = () => {
   useEffect(() => {
     // Load services from localStorage or use defaults
     const storedServices = localStorage.getItem('wheelspa_services');
-    setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+    if (storedServices) {
+      const parsed = JSON.parse(storedServices);
+      if (parsed.some(s => s.id === 'foam-wash')) {
+        localStorage.removeItem('wheelspa_services');
+        setServices(DEFAULT_SERVICES);
+        return;
+      }
+      setServices(parsed);
+    } else {
+      setServices(DEFAULT_SERVICES);
+    }
   }, []);
 
   useEffect(() => {
