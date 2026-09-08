@@ -24,10 +24,12 @@ const Booking = () => {
     service: '',
     carBrand: '',
     carModel: '',
+    carNumber: '',
     date: null,
     timeSlot: '',
     notes: '',
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingId, setBookingId] = useState('');
@@ -80,12 +82,27 @@ const Booking = () => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (formData.phone.replace(/\D/g, '').length !== 10) {
+      newErrors.phone = 'Enter a valid 10-digit phone number';
+    }
+
     if (!formData.service) newErrors.service = 'Please select a service';
     if (!formData.carBrand) newErrors.carBrand = 'Please select car brand';
     if (!formData.carModel.trim()) newErrors.carModel = 'Car model is required';
+
+    const carNumberRegex = /^[A-Za-z]{2}[\s-]?[0-9]{1,2}[\s-]?[A-Za-z]{0,3}[\s-]?[0-9]{1,4}$/;
+    if (!formData.carNumber.trim()) {
+      newErrors.carNumber = 'Car number is required';
+    } else if (!carNumberRegex.test(formData.carNumber.trim())) {
+      newErrors.carNumber = 'Enter a valid car number (e.g. MH12 1452)';
+    }
+
     if (!formData.date) newErrors.date = 'Please select a date';
     if (!formData.timeSlot) newErrors.timeSlot = 'Please select a time slot';
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -115,6 +132,8 @@ const Booking = () => {
       serviceName: services.find(s => s.id === formData.service)?.name || formData.service,
       carBrand: formData.carBrand,
       carModel: formData.carModel,
+      carNumber: formData.carNumber,
+      car_number: formData.carNumber,
       appointmentDate: formattedDate,
       appointment_date: formattedDate,
       timeSlot: formData.timeSlot,
@@ -134,6 +153,15 @@ const Booking = () => {
       });
       
       if (!response.ok) {
+        if (response.status === 409) {
+          const errorData = await response.json().catch(() => ({}));
+          const message = errorData.detail || "This time slot has already been booked. Please select another time slot.";
+          toast.error(message);
+          if (formData.date) {
+            fetchSlots(formData.date);
+          }
+          return;
+        }
         throw new Error('Failed to save booking');
       }
 
@@ -178,7 +206,7 @@ const Booking = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Vehicle:</span>
                       <span className="text-gray-900 font-medium">
-                        {formData.carBrand} {formData.carModel}
+                        {formData.carBrand} {formData.carModel} ({formData.carNumber})
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -206,7 +234,7 @@ const Booking = () => {
                       setIsSubmitted(false);
                       setFormData({
                         name: '', phone: '', email: '', service: '',
-                        carBrand: '', carModel: '', date: null, timeSlot: '', notes: ''
+                        carBrand: '', carModel: '', carNumber: '', date: null, timeSlot: '', notes: ''
                       });
                     }}
                   >
@@ -363,6 +391,17 @@ const Booking = () => {
                         placeholder="e.g., City, Creta, 3 Series"
                       />
                       {errors.carModel && <p className="text-red-500 text-sm mt-1">{errors.carModel}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="carNumber">Car Number</Label>
+                      <Input
+                        id="carNumber"
+                        value={formData.carNumber}
+                        onChange={(e) => handleInputChange('carNumber', e.target.value)}
+                        className={`mt-2 ${errors.carNumber ? 'border-red-500' : ''}`}
+                        placeholder="MH12AB1234"
+                      />
+                      {errors.carNumber && <p className="text-red-500 text-sm mt-1">{errors.carNumber}</p>}
                     </div>
                   </div>
                 </div>

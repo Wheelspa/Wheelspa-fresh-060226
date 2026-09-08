@@ -46,6 +46,7 @@ const AdminBookings = () => {
     serviceName: b.serviceName || b.service || 'Detailing Service',
     carBrand: b.carBrand || '',
     carModel: b.carModel || '',
+    carNumber: b.carNumber || b.car_number || '',
     appointmentDate: b.appointmentDate || b.appointment_date || '',
     timeSlot: b.timeSlot || b.time_slot || '',
     status: b.status || 'pending',
@@ -305,7 +306,7 @@ const AdminBookings = () => {
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Car className="h-4 w-4 mr-2 text-gray-400" />
-                        {booking.carBrand} {booking.carModel}
+                        {booking.carBrand} {booking.carModel} {booking.carNumber ? `(${booking.carNumber})` : ''}
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
@@ -400,6 +401,10 @@ const AdminBookings = () => {
                 <div>
                   <p className="text-sm text-gray-500">Car Model</p>
                   <p className="font-medium">{selectedBooking.carModel}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Car Number</p>
+                  <p className="font-medium">{selectedBooking.carNumber || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Service</p>

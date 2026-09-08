@@ -104,6 +104,28 @@ class PasswordChange(BaseModel):
     old_password: str
     new_password: str
 
+class BookingCreate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: Optional[str] = None
+    customerName: Optional[str] = None
+    customer_name: Optional[str] = None
+    phone: str
+    email: Optional[str] = ""
+    service: str
+    serviceName: Optional[str] = None
+    carBrand: str
+    carModel: str
+    carNumber: str
+    car_number: Optional[str] = None
+    appointmentDate: Optional[str] = None
+    appointment_date: Optional[str] = None
+    timeSlot: Optional[str] = None
+    time_slot: Optional[str] = None
+    notes: Optional[str] = ""
+    status: Optional[str] = "pending"
+    payment_status: Optional[str] = "unpaid"
+    createdAt: Optional[str] = None
+
 # ============== HELPER FUNCTIONS ==============
 
 def verify_password(plain_password, hashed_password):
@@ -390,12 +412,37 @@ async def get_bookings(current_user: dict = Depends(get_current_user)):
     return bookings
 
 @api_router.post("/bookings")
-async def create_booking(booking: dict):
+async def create_booking(booking_data: BookingCreate):
     # Public endpoint - no auth required
-    booking["id"] = booking.get("id", str(uuid.uuid4()))
+    booking = booking_data.model_dump()
+    
+    # Ensure both carNumber and car_number are populated
+    car_num = booking.get("carNumber") or booking.get("car_number")
+    booking["carNumber"] = car_num
+    booking["car_number"] = car_num
+    
+    # Extract appointment date and time slot for conflict check
+    appointment_date = booking.get("appointment_date") or booking.get("appointmentDate")
+    time_slot = booking.get("time_slot") or booking.get("timeSlot")
+    
+    if appointment_date and time_slot:
+        existing = await db.bookings.find_one({
+            "$and": [
+                {"$or": [{"appointment_date": appointment_date}, {"appointmentDate": appointment_date}]},
+                {"$or": [{"time_slot": time_slot}, {"timeSlot": time_slot}]},
+                {"status": {"$ne": "cancelled"}}
+            ]
+        })
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="This time slot has already been booked. Please select another time slot."
+            )
+
+    booking["id"] = booking.get("id") or str(uuid.uuid4())
     booking["created_at"] = datetime.now(timezone.utc).isoformat()
-    booking["status"] = booking.get("status", "pending")
-    booking["payment_status"] = booking.get("payment_status", "unpaid")  # unpaid, paid
+    booking["status"] = booking.get("status") or "pending"
+    booking["payment_status"] = booking.get("payment_status") or "unpaid"  # unpaid, paid
     await db.bookings.insert_one(booking)
     booking.pop("_id", None)
     return booking
