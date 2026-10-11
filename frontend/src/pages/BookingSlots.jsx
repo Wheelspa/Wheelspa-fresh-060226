@@ -277,7 +277,7 @@ const BookingSlots = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
+            <div className="grid grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-3">
               {slots.map((slot) => (
                 <button
                   key={slot.time}

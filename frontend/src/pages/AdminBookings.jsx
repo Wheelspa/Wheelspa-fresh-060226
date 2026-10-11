@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Phone, Mail, Car, Clock, Eye, Trash2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Phone, Mail, Car, Clock, Eye, Trash2, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -21,6 +21,68 @@ import AdminLayout from '../components/admin/AdminLayout';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+
+// WhatsApp notification templates for admin -> customer messages
+export const CONFIRMED_BOOKING_WA_TEMPLATE =
+  "Hello {name}, your Wheelspa booking is confirmed. Booking ID: {id}. Service: {service}. Date: {date}, Time: {time}. Location: Opposite Pink City, Kaspate Vasti Road, Wakad, Pune. See you soon!";
+
+export const REJECTED_BOOKING_WA_TEMPLATE =
+  "Hello {name}, sorry, the requested slot could not be confirmed. Please choose another time on wheelspa.in or call us at 70226-70226.";
+
+export const normalizePhoneTo91 = (phone) => {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits;
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return '91' + digits.slice(1);
+  }
+  if (digits.length === 10) {
+    return '91' + digits;
+  }
+  if (digits.length > 10) {
+    return '91' + digits.slice(-10);
+  }
+  return '91' + digits;
+};
+
+export const buildCustomerWhatsAppUrl = (booking) => {
+  if (!booking || !booking.phone) return '#';
+  const phone = normalizePhoneTo91(booking.phone);
+  const name = booking.customerName || booking.customer_name || 'Customer';
+  const service = booking.serviceName || booking.service || 'Detailing Service';
+
+  let formattedDate = 'N/A';
+  const rawDate = booking.appointmentDate || booking.appointment_date;
+  if (rawDate) {
+    try {
+      const parsed = rawDate.includes('T') ? new Date(rawDate) : new Date(rawDate.replace(/-/g, '/'));
+      formattedDate = format(parsed, 'dd MMM yyyy');
+    } catch {
+      formattedDate = rawDate;
+    }
+  }
+
+  const time = booking.timeSlot || booking.time_slot || '';
+
+  let message = '';
+  if (booking.status === 'confirmed') {
+    message = CONFIRMED_BOOKING_WA_TEMPLATE
+      .replace('{name}', name)
+      .replace('{id}', booking.id || '')
+      .replace('{service}', service)
+      .replace('{date}', formattedDate)
+      .replace('{time}', time);
+  } else if (booking.status === 'rejected') {
+    message = REJECTED_BOOKING_WA_TEMPLATE
+      .replace('{name}', name);
+  } else {
+    return '#';
+  }
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -77,50 +139,35 @@ const AdminBookings = () => {
 
   const updateBookingStatus = async (bookingId, newStatus) => {
     try {
-      if (admin?.role === 'admin') {
-        // Submit approval request for admin
-        const targetBooking = bookings.find(b => b.id === bookingId);
-        const response = await fetch(`${API_URL}/api/approval-requests`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${admin?.token}`
-          },
-          body: JSON.stringify({
-            request_type: 'edit',
-            data_type: 'booking',
-            data_id: bookingId,
-            original_data: targetBooking,
-            new_data: { ...targetBooking, status: newStatus },
-            notes: `Status update to ${newStatus}`
-          })
-        });
-        if (response.ok) {
-          toast.success('Approval request submitted to update status');
-        } else {
-          toast.error('Failed to submit approval request');
-        }
+      const response = await fetch(`${API_URL}/api/bookings/${bookingId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${admin?.token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(data.message || `Booking status updated to ${newStatus}`);
+        loadBookings();
       } else {
-        // Direct update for superadmin/owner
-        const response = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${admin?.token}`
-          },
-          body: JSON.stringify({ status: newStatus })
-        });
-        if (response.ok) {
-          toast.success(`Booking status updated to ${newStatus}`);
-          loadBookings();
-        } else {
-          toast.error('Failed to update booking status');
-        }
+        toast.error(data.detail || 'Failed to update booking status');
       }
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Connection error updating status');
     }
+  };
+
+  const handleRejectBooking = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to reject this booking?')) return;
+    await updateBookingStatus(bookingId, 'rejected');
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to cancel this booking?')) return;
+    await updateBookingStatus(bookingId, 'cancelled');
   };
 
   const deleteBooking = async (bookingId) => {
@@ -170,6 +217,7 @@ const AdminBookings = () => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       case 'completed': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -180,6 +228,7 @@ const AdminBookings = () => {
     switch (status) {
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'pending': return <AlertCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
       case 'cancelled': return <XCircle className="h-4 w-4" />;
       case 'completed': return <CheckCircle className="h-4 w-4" />;
       default: return <AlertCircle className="h-4 w-4" />;
@@ -264,6 +313,7 @@ const AdminBookings = () => {
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -306,7 +356,9 @@ const AdminBookings = () => {
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Car className="h-4 w-4 mr-2 text-gray-400" />
-                        {booking.carBrand} {booking.carModel} {booking.carNumber ? `(${booking.carNumber})` : ''}
+                        {[booking.carBrand, booking.carModel].filter(Boolean).join(' ')
+                          ? `${[booking.carBrand, booking.carModel].filter(Boolean).join(' ')} ${booking.carNumber ? `(${booking.carNumber})` : ''}`.trim()
+                          : (booking.carNumber || 'N/A')}
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
@@ -325,21 +377,70 @@ const AdminBookings = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <Select 
-                      value={booking.status} 
-                      onValueChange={(value) => updateBookingStatus(booking.id, value)}
-                    >
-                      <SelectTrigger className="w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(booking.status === 'confirmed' || booking.status === 'rejected') && (
+                      <a
+                        href={buildCustomerWhatsAppUrl(booking)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 border-green-500 hover:bg-green-50 hover:text-green-700 flex items-center gap-1.5"
+                          data-testid={`whatsapp-customer-${booking.id}`}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          WhatsApp customer
+                        </Button>
+                      </a>
+                    )}
+                    {booking.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                          onClick={() => updateBookingStatus(booking.id, 'confirmed')}
+                          data-testid={`approve-booking-${booking.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1"
+                          onClick={() => handleRejectBooking(booking.id)}
+                          data-testid={`reject-booking-${booking.id}`}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {booking.status === 'confirmed' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
+                          onClick={() => updateBookingStatus(booking.id, 'completed')}
+                          data-testid={`complete-booking-${booking.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Mark Completed
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-500 hover:bg-red-50 hover:text-red-700 flex items-center gap-1"
+                          onClick={() => handleCancelBooking(booking.id)}
+                          data-testid={`cancel-booking-${booking.id}`}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -458,12 +559,17 @@ const AdminBookings = () => {
                   </Button>
                 </a>
                 <a 
-                  href={`https://wa.me/91${selectedBooking.phone.replace(/\D/g, '')}`}
+                  href={
+                    (selectedBooking.status === 'confirmed' || selectedBooking.status === 'rejected')
+                      ? buildCustomerWhatsAppUrl(selectedBooking)
+                      : `https://wa.me/${normalizePhoneTo91(selectedBooking.phone)}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1"
                 >
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
                     WhatsApp
                   </Button>
                 </a>

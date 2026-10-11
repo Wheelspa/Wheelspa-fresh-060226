@@ -9,14 +9,71 @@ import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import Layout from '../components/layout/Layout';
-import { SERVICES as DEFAULT_SERVICES, CAR_BRANDS, BRAND_INFO } from '../data/mock';
+import { CAR_BRANDS, BRAND_INFO } from '../data/mock';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+
+// Exactly 9 services for customer booking in specified order
+export const BOOKING_SERVICES = [
+  { id: 'royal-foam-wash', name: 'Royal Foam Wash' },
+  { id: 'top-wash', name: 'Top Wash' },
+  { id: 'interior-deep-cleaning', name: 'Interior Deep Cleaning' },
+  { id: 'rubbing-polishing', name: 'Rubbing Polishing' },
+  { id: 'ppf', name: 'Paint Protection Film (PPF)' },
+  { id: 'ceramic', name: 'Ceramic Coating' },
+  { id: 'graphene', name: 'Graphene Coating' },
+  { id: 'headlamp', name: 'Headlamp Restoration' },
+  { id: 'engine', name: 'Engine Bay Cleaning' },
+];
+
+export const isValidPhone = (val) => {
+  if (!val) return false;
+  let str = String(val).trim().replace(/[\s\-]/g, '');
+  if (str.startsWith('+91')) {
+    str = str.slice(3);
+  }
+  return /^\d{10}$/.test(str);
+};
+
+export const isValidCarNumber = (val) => {
+  if (!val) return false;
+  const str = String(val).trim().replace(/[\s\-]/g, '').toUpperCase();
+  return /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/.test(str);
+};
+
+// WhatsApp notification template sent by customer after booking (English, easy to edit)
+export const CUSTOMER_BOOKING_WA_TEMPLATE =
+  "Hello Wheelspa, I have requested an appointment. Name: {name}, Phone: {phone}, Service: {service}, Car: {brand} {model} {number}, Date: {date}, Time: {time}.";
+
+export const buildCustomerWhatsAppMessage = ({ name, phone, service, carBrand, carModel, carNumber, date, time }) => {
+  const carParts = [carBrand, carModel, carNumber]
+    .filter(val => val != null && String(val).trim() !== '')
+    .map(val => String(val).trim());
+  const carString = carParts.join(' ');
+
+  let msg = CUSTOMER_BOOKING_WA_TEMPLATE
+    .replace('{name}', name ? String(name).trim() : '')
+    .replace('{phone}', phone ? String(phone).trim() : '')
+    .replace('{service}', service ? String(service).trim() : '')
+    .replace('{date}', date || '')
+    .replace('{time}', time || '');
+
+  if (msg.includes('{brand} {model} {number}')) {
+    msg = msg.replace('{brand} {model} {number}', carString);
+  } else {
+    msg = msg
+      .replace('{brand}', carBrand ? String(carBrand).trim() : '')
+      .replace('{model}', carModel ? String(carModel).trim() : '')
+      .replace('{number}', carNumber ? String(carNumber).trim() : '');
+  }
+
+  return msg.replace(/\s+/g, ' ').replace(' ,', ',').trim();
+};
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Booking = () => {
-  const [services, setServices] = useState([]);
+  const services = BOOKING_SERVICES;
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -36,22 +93,6 @@ const Booking = () => {
   const [errors, setErrors] = useState({});
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
-
-  useEffect(() => {
-    // Load services from localStorage
-    const storedServices = localStorage.getItem('wheelspa_services');
-    if (storedServices) {
-      const parsed = JSON.parse(storedServices);
-      if (parsed.some(s => s.id === 'foam-wash')) {
-        localStorage.removeItem('wheelspa_services');
-        setServices(DEFAULT_SERVICES);
-        return;
-      }
-      setServices(parsed);
-    } else {
-      setServices(DEFAULT_SERVICES);
-    }
-  }, []);
 
   // Fetch slots when date changes
   useEffect(() => {
@@ -79,41 +120,86 @@ const Booking = () => {
   const timeSlots = [
     '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
     '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM',
-    '05:00 PM'
+    '05:00 PM', '06:00 PM'
   ];
+
+  const isFieldValid = (field, value) => {
+    switch (field) {
+      case 'name':
+        return Boolean(value && String(value).trim());
+      case 'phone':
+        return isValidPhone(value);
+      case 'service':
+        return Boolean(value);
+      case 'carNumber':
+        return isValidCarNumber(value);
+      case 'date':
+        return Boolean(value);
+      case 'timeSlot':
+        return Boolean(value);
+      default:
+        return true;
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+    if (errors[field] && isFieldValid(field, value)) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-    
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (formData.phone.replace(/\D/g, '').length !== 10) {
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+
+    if (!isValidPhone(formData.phone)) {
       newErrors.phone = 'Enter a valid 10-digit phone number';
     }
 
-    if (!formData.service) newErrors.service = 'Please select a service';
-    if (!formData.carBrand) newErrors.carBrand = 'Please select car brand';
-
-    const carNumberRegex = /^[A-Za-z]{2}[\s-]?[0-9]{1,2}[\s-]?[A-Za-z]{0,3}[\s-]?[0-9]{1,4}$/;
-    if (!formData.carNumber.trim()) {
-      newErrors.carNumber = 'Car number is required';
-    } else if (!carNumberRegex.test(formData.carNumber.trim())) {
-      newErrors.carNumber = 'Enter a valid car number (e.g. MH12 1452)';
+    if (!formData.service) {
+      newErrors.service = 'Please select a service';
     }
 
-    if (!formData.date) newErrors.date = 'Please select a date';
-    if (!formData.timeSlot) newErrors.timeSlot = 'Please select a time slot';
-    
+    if (!isValidCarNumber(formData.carNumber)) {
+      newErrors.carNumber = 'Enter a valid car number (e.g. MH12AB1234)';
+    }
+
+    if (!formData.date) {
+      newErrors.date = 'Please select a date';
+    }
+
+    if (!formData.timeSlot) {
+      newErrors.timeSlot = 'Please select a time slot';
+    }
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (Object.keys(newErrors).length > 0) {
+      toast.error('Please fix the highlighted fields');
+
+      const fieldOrder = ['name', 'phone', 'service', 'carNumber', 'date', 'timeSlot'];
+      const firstInvalidField = fieldOrder.find(f => newErrors[f]);
+      if (firstInvalidField) {
+        const element = document.getElementById(firstInvalidField);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (typeof element.focus === 'function') {
+            element.focus();
+          }
+        }
+      }
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -215,7 +301,9 @@ const Booking = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Vehicle:</span>
                       <span className="text-gray-900 font-medium">
-                        {formData.carBrand} {formData.carModel} ({formData.carNumber})
+                        {[formData.carBrand, formData.carModel].filter(Boolean).join(' ')
+                          ? `${[formData.carBrand, formData.carModel].filter(Boolean).join(' ')} (${formData.carNumber})`
+                          : (formData.carNumber || 'N/A')}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -231,10 +319,25 @@ const Booking = () => {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <a href={`https://wa.me/91${BRAND_INFO.whatsapp}`}>
+                  <a
+                    href={`https://wa.me/917770073535?text=${encodeURIComponent(
+                      buildCustomerWhatsAppMessage({
+                        name: formData.name,
+                        phone: formData.phone,
+                        service: services.find(s => s.id === formData.service)?.name || formData.service,
+                        carBrand: formData.carBrand,
+                        carModel: formData.carModel,
+                        carNumber: formData.carNumber,
+                        date: formData.date ? format(formData.date, 'PPP') : '',
+                        time: formData.timeSlot
+                      })
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <Button className="bg-green-500 hover:bg-green-600 text-white w-full">
                       <MessageCircle className="h-4 w-4 mr-2" />
-                      Chat on WhatsApp
+                      Send details on WhatsApp
                     </Button>
                   </a>
                   <Button
@@ -343,13 +446,13 @@ const Booking = () => {
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
                     Service Selection
                   </h3>
-                  <div>
-                    <Label>Select Service *</Label>
+                  <div id="service">
+                    <Label htmlFor="service">Select Service *</Label>
                     <Select
                       value={formData.service}
                       onValueChange={(value) => handleInputChange('service', value)}
                     >
-                      <SelectTrigger className={`mt-2 ${errors.service ? 'border-red-500' : ''}`}>
+                      <SelectTrigger id="service" className={`mt-2 ${errors.service ? 'border-red-500 focus:ring-red-500' : ''}`}>
                         <SelectValue placeholder="Choose a service" />
                       </SelectTrigger>
                       <SelectContent>
@@ -372,12 +475,12 @@ const Booking = () => {
                   </h3>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <Label>Car Brand *</Label>
+                      <Label htmlFor="carBrand">Car Brand</Label>
                       <Select
                         value={formData.carBrand}
                         onValueChange={(value) => handleInputChange('carBrand', value)}
                       >
-                        <SelectTrigger className={`mt-2 ${errors.carBrand ? 'border-red-500' : ''}`}>
+                        <SelectTrigger id="carBrand" className="mt-2">
                           <SelectValue placeholder="Select brand" />
                         </SelectTrigger>
                         <SelectContent>
@@ -388,26 +491,24 @@ const Booking = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      {errors.carBrand && <p className="text-red-500 text-sm mt-1">{errors.carBrand}</p>}
                     </div>
                     <div>
-                      <Label htmlFor="carModel">Car Model (Optional)</Label>
+                      <Label htmlFor="carModel">Car Model</Label>
                       <Input
                         id="carModel"
                         value={formData.carModel}
                         onChange={(e) => handleInputChange('carModel', e.target.value)}
-                        className={`mt-2 ${errors.carModel ? 'border-red-500' : ''}`}
+                        className="mt-2"
                         placeholder="e.g., City, Creta, 3 Series"
                       />
-                      {errors.carModel && <p className="text-red-500 text-sm mt-1">{errors.carModel}</p>}
                     </div>
                     <div>
-                      <Label htmlFor="carNumber">Car Number</Label>
+                      <Label htmlFor="carNumber">Car Number *</Label>
                       <Input
                         id="carNumber"
                         value={formData.carNumber}
                         onChange={(e) => handleInputChange('carNumber', e.target.value)}
-                        className={`mt-2 ${errors.carNumber ? 'border-red-500' : ''}`}
+                        className={`mt-2 ${errors.carNumber ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         placeholder="MH12AB1234"
                       />
                       {errors.carNumber && <p className="text-red-500 text-sm mt-1">{errors.carNumber}</p>}
@@ -423,11 +524,12 @@ const Booking = () => {
                   </h3>
                   
                   {/* Date Selection */}
-                  <div className="mb-6">
-                    <Label>Select Date *</Label>
+                  <div id="date-section" className="mb-6">
+                    <Label htmlFor="date">Select Date *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
+                          id="date"
                           variant="outline"
                           className={`w-full mt-2 justify-start text-left font-normal ${
                             !formData.date && 'text-muted-foreground'
@@ -473,14 +575,14 @@ const Booking = () => {
 
                   {/* Visual Slot Grid */}
                   {formData.date && (
-                    <div className="mb-6">
+                    <div id="timeSlot" className="mb-6">
                       <Label className="mb-3 block">Select Time Slot * <span className="text-gray-500 text-sm">(Tap to select)</span></Label>
                       {loadingSlots ? (
                         <div className="flex items-center justify-center py-8">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                        <div className={`grid grid-cols-3 sm:grid-cols-5 gap-3 p-1 rounded-xl ${errors.timeSlot ? 'border-2 border-red-500' : ''}`}>
                           {timeSlots.map((time) => {
                             const slotInfo = slots.find(s => s.time === time);
                             const isBooked = slotInfo && slotInfo.status !== 'available';
@@ -531,7 +633,10 @@ const Booking = () => {
                   )}
 
                   {!formData.date && (
-                    <p className="text-gray-500 text-sm italic">Please select a date to see available time slots</p>
+                    <div id="timeSlot" className="mb-6">
+                      <p className="text-gray-500 text-sm italic">Please select a date to see available time slots</p>
+                      {errors.timeSlot && <p className="text-red-500 text-sm mt-1">{errors.timeSlot}</p>}
+                    </div>
                   )}
                 </div>
 

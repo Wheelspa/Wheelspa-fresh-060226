@@ -3,7 +3,8 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
   Home, ChevronRight, Bell, Wallet, Users, Settings, CalendarCheck,
-  Crown, Shield, UserCog, ClipboardCheck, UserPlus, Star, CalendarDays
+  Crown, Shield, UserCog, ClipboardCheck, UserPlus, Star, CalendarDays,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -75,6 +76,7 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/dashboard', label: 'Dashboard', icon: Home },
     { path: '/admin/bookings', label: 'Customer Bookings', icon: CalendarCheck },
     { path: '/admin/slots', label: 'Booking Slots', icon: CalendarDays },
+    { path: '/admin/quotations', label: 'PPF Quotation', icon: FileSpreadsheet },
     { path: '/admin/new-entry', label: 'New Entry', icon: Plus },
     { path: '/admin/entries', label: 'All Entries', icon: List },
     { path: '/admin/reports', label: 'Reports', icon: BarChart3 },
@@ -119,7 +121,7 @@ const AdminLayout = ({ children, title }) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 z-50 h-full w-64 bg-gray-900 transform transition-transform duration-300 lg:translate-x-0 ${
+      <aside className={`fixed top-0 left-0 z-50 h-full w-64 bg-gray-900 transform transition-transform duration-300 lg:translate-x-0 print:hidden ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex flex-col h-full">
@@ -276,9 +278,9 @@ const AdminLayout = ({ children, title }) => {
       </aside>
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-64 print:ml-0">
         {/* Top Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-30">
+        <header className="bg-white shadow-sm sticky top-0 z-30 print:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center space-x-4">
               <button

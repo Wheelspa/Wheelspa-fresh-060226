@@ -25,6 +25,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminApprovals from "./pages/AdminApprovals";
 import EmployeePerformance from "./pages/EmployeePerformance";
 import BookingSlots from "./pages/BookingSlots";
+import AdminQuotations from "./pages/AdminQuotations";
 
 // Installer Payment Pages
 import InstallerDashboard from "./pages/InstallerDashboard";
@@ -114,6 +115,14 @@ const AdminRoutes = () => {
         element={
           <ProtectedRoute>
             <BookingSlots />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/quotations" 
+        element={
+          <ProtectedRoute>
+            <AdminQuotations />
           </ProtectedRoute>
         } 
       />

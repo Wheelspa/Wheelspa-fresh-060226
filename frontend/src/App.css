@@ -192,3 +192,40 @@ button:focus {
     ring: 2px;
     ring-color: #22c55e;
 }
+
+/* Print styles for quotations and receipts */
+@media print {
+    aside,
+    nav,
+    header,
+    footer,
+    button,
+    .no-print,
+    .print-hide {
+        display: none !important;
+    }
+
+    body,
+    html {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    .print-only {
+        display: block !important;
+    }
+
+    .print-hidden {
+        display: none !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 12mm 15mm;
+    }
+}
+

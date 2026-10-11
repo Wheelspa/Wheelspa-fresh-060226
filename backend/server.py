@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import asyncio
+import re
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -12,6 +14,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from pymongo import ReturnDocument
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,7 +22,43 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+_test_clients = {}
+
+# Safety check for tests: prevent test execution against real database
+if os.environ.get("IS_TESTING") == "true":
+    real_db_name = os.environ.get("REAL_DB_NAME", "wheelspa_dev").strip('"\'')
+    current_db_name = os.environ.get("DB_NAME", "").strip('"\'')
+    if current_db_name == real_db_name or not current_db_name.endswith("_test"):
+        raise RuntimeError(
+            f"SAFETY ABORT: Tests must never connect to real database '{real_db_name}'. "
+            f"Current DB_NAME is '{current_db_name}'. Must end with '_test'."
+        )
+
+class DatabaseProxy:
+    """
+    Proxy providing database access.
+    In normal production runs: directly uses the single `client` instance connected to DB_NAME.
+    In testing mode (IS_TESTING == 'true'): maintains event-loop-safe clients across test coroutines.
+    """
+    def __getattr__(self, name):
+        if os.environ.get("IS_TESTING") == "true":
+            try:
+                loop = asyncio.get_running_loop()
+                if loop not in _test_clients:
+                    _test_clients[loop] = AsyncIOMotorClient(mongo_url)
+                return _test_clients[loop][os.environ['DB_NAME']][name]
+            except RuntimeError:
+                pass
+        return client[os.environ['DB_NAME']][name]
+
+    @property
+    def name(self):
+        return os.environ['DB_NAME']
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+db = DatabaseProxy()
 
 # Security
 SECRET_KEY = os.environ.get('JWT_SECRET', 'wheelspa-secret-key-change-in-production')
@@ -113,7 +152,8 @@ class BookingCreate(BaseModel):
     email: Optional[str] = ""
     service: str
     serviceName: Optional[str] = None
-    carBrand: str
+    carBrand: Optional[str] = ""
+    car_brand: Optional[str] = None
     carModel: Optional[str] = ""
     carNumber: str
     car_number: Optional[str] = None
@@ -126,7 +166,72 @@ class BookingCreate(BaseModel):
     payment_status: Optional[str] = "unpaid"
     createdAt: Optional[str] = None
 
+class BookingStatusUpdate(BaseModel):
+    status: str
+
+class QuotationCreate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    quotation_no: Optional[str] = None
+    quotationNo: Optional[str] = None
+    quotation_date: Optional[str] = None
+    quotationDate: Optional[str] = None
+    customer_name: Optional[str] = None
+    customerName: Optional[str] = None
+    mobile_number: Optional[str] = None
+    mobileNumber: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    vehicleModel: Optional[str] = None
+    ppf_package: Optional[str] = None
+    ppfPackage: Optional[str] = None
+    basic_cost: Optional[float] = 0.0
+    basicCost: Optional[float] = 0.0
+    installer_charges: Optional[float] = 0.0
+    installerCharges: Optional[float] = 0.0
+    detailing_charges: Optional[float] = 0.0
+    detailingCharges: Optional[float] = 0.0
+    margin_percentage: Optional[float] = 30.0
+    marginPercentage: Optional[float] = None
+    gst_percentage: Optional[float] = 18.0
+    gstPercentage: Optional[float] = None
+
 # ============== HELPER FUNCTIONS ==============
+
+def calculate_quotation_totals(
+    basic_cost: float,
+    installer_charges: float,
+    detailing_charges: float,
+    margin_percentage: float,
+    gst_percentage: float
+) -> dict:
+    total_cost = round(basic_cost + installer_charges + detailing_charges, 2)
+    margin_amount = round(total_cost * (margin_percentage / 100.0), 2)
+    total_cost_incl_margin = round(total_cost + margin_amount, 2)
+    gst_amount = round(total_cost_incl_margin * (gst_percentage / 100.0), 2)
+    final_quotation_value = round(total_cost_incl_margin + gst_amount, 2)
+    return {
+        "total_cost": total_cost,
+        "margin_amount": margin_amount,
+        "total_cost_incl_margin": total_cost_incl_margin,
+        "gst_amount": gst_amount,
+        "final_quotation_value": final_quotation_value
+    }
+
+def format_quotation_number(seq: int) -> str:
+    return f"WSPPF-{seq:03d}"
+
+async def get_next_quotation_seq() -> int:
+    counter = await db.counters.find_one_and_update(
+        {"_id": "quotation_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    return counter["seq"]
+
+async def peek_next_quotation_seq() -> int:
+    counter = await db.counters.find_one({"_id": "quotation_number"})
+    current_seq = counter.get("seq", 0) if counter else 0
+    return current_seq + 1
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -430,7 +535,7 @@ async def create_booking(booking_data: BookingCreate):
             "$and": [
                 {"$or": [{"appointment_date": appointment_date}, {"appointmentDate": appointment_date}]},
                 {"$or": [{"time_slot": time_slot}, {"timeSlot": time_slot}]},
-                {"status": {"$ne": "cancelled"}}
+                {"status": {"$nin": ["cancelled", "rejected"]}}
             ]
         })
         if existing:
@@ -439,7 +544,8 @@ async def create_booking(booking_data: BookingCreate):
                 detail="This time slot has already been booked. Please select another time slot."
             )
 
-    booking["id"] = booking.get("id") or str(uuid.uuid4())
+    # Generate booking ID on backend with WS-BK- prefix (ignore client-supplied id)
+    booking["id"] = f"WS-BK-{uuid.uuid4().hex[:8].upper()}"
     booking["created_at"] = datetime.now(timezone.utc).isoformat()
     booking["status"] = booking.get("status") or "pending"
     booking["payment_status"] = booking.get("payment_status") or "unpaid"  # unpaid, paid
@@ -453,7 +559,7 @@ async def get_booking_slots(date: Optional[str] = None):
     # Define available time slots
     time_slots = [
         "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
+        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM"
     ]
     
     # Get bookings for the specified date or all upcoming
@@ -471,8 +577,8 @@ async def get_booking_slots(date: Optional[str] = None):
         booking_status = booking.get('status', 'pending')
         
         # Determine slot status
-        if booking_status == 'cancelled':
-            continue  # Cancelled bookings don't block slots
+        if booking_status in ['cancelled', 'rejected']:
+            continue  # Cancelled and rejected bookings don't block slots
         elif payment_status == 'paid':
             slot_map[key] = {
                 "status": "booked_paid",
@@ -497,19 +603,22 @@ async def get_slots_for_date(date: str):
     """Get slot availability for a specific date - Public endpoint"""
     time_slots = [
         "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
+        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM"
     ]
     
     # Get bookings for this date
     bookings = await db.bookings.find(
-        {"appointment_date": date, "status": {"$ne": "cancelled"}},
+        {
+            "$or": [{"appointment_date": date}, {"appointmentDate": date}],
+            "status": {"$nin": ["cancelled", "rejected"]}
+        },
         {"_id": 0}
     ).to_list(100)
     
     # Build slot list with status
     slots = []
     for slot in time_slots:
-        booking = next((b for b in bookings if b.get("time_slot") == slot), None)
+        booking = next((b for b in bookings if (b.get("time_slot") or b.get("timeSlot")) == slot), None)
         if booking:
             payment_status = booking.get("payment_status", "unpaid")
             slots.append({
@@ -546,6 +655,58 @@ async def update_booking_payment(booking_id: str, payment_data: dict, current_us
         raise HTTPException(status_code=404, detail="Booking not found")
     
     return {"message": "Payment status updated successfully"}
+
+@api_router.put("/bookings/{booking_id}/status")
+async def update_booking_status(
+    booking_id: str,
+    status_data: BookingStatusUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    await require_role(["admin", "superadmin", "owner"], current_user)
+    
+    valid_statuses = ["confirmed", "rejected", "completed", "cancelled"]
+    new_status = status_data.status
+    if new_status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{new_status}'. Allowed statuses: {', '.join(valid_statuses)}."
+        )
+    
+    booking = await db.bookings.find_one({"id": booking_id})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    current_status = booking.get("status", "pending")
+    
+    # Allowed transitions only:
+    # - pending -> confirmed or rejected
+    # - confirmed -> completed or cancelled
+    allowed_transitions = {
+        "pending": ["confirmed", "rejected"],
+        "confirmed": ["completed", "cancelled"]
+    }
+    
+    allowed = allowed_transitions.get(current_status, [])
+    if new_status not in allowed:
+        if allowed:
+            allowed_str = ", ".join(f"'{s}'" for s in allowed)
+            detail_msg = f"Cannot transition booking from '{current_status}' to '{new_status}'. Allowed transitions: {allowed_str}."
+        else:
+            detail_msg = f"Cannot transition booking from terminal status '{current_status}'."
+        raise HTTPException(status_code=409, detail=detail_msg)
+    
+    update_data = {
+        "status": new_status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status_updated_by": current_user.get("username")
+    }
+    await db.bookings.update_one({"id": booking_id}, {"$set": update_data})
+    
+    return {
+        "message": f"Booking status updated to {new_status}",
+        "id": booking_id,
+        "status": new_status
+    }
 
 @api_router.put("/bookings/{booking_id}")
 async def update_booking(booking_id: str, booking_data: dict, current_user: dict = Depends(get_current_user)):
@@ -1017,6 +1178,159 @@ async def get_performance_summary(current_user: dict = Depends(get_current_user)
         "employee_stats": employee_stats
     }
 
+# ============== PPF QUOTATIONS ==============
+
+@api_router.get("/quotations/next-number")
+async def get_next_quotation_number(current_user: dict = Depends(get_current_user)):
+    """Get the next preview quotation number without advancing counter - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    next_seq = await peek_next_quotation_seq()
+    return {"next_quotation_number": format_quotation_number(next_seq)}
+
+@api_router.post("/quotations")
+async def create_quotation(data: QuotationCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new PPF quotation - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+
+    customer_name = (data.customer_name or data.customerName or "").strip()
+    mobile_input = (data.mobile_number or data.mobileNumber or "").strip()
+    vehicle_model = (data.vehicle_model or data.vehicleModel or "").strip()
+    ppf_package = (data.ppf_package or data.ppfPackage or "").strip()
+    quotation_date = (data.quotation_date or data.quotationDate or datetime.now().strftime("%Y-%m-%d")).strip()
+
+    if not customer_name:
+        raise HTTPException(status_code=400, detail="Customer Name is required")
+
+    cleaned_mobile = re.sub(r"\D", "", mobile_input)
+    if len(cleaned_mobile) != 10:
+        raise HTTPException(status_code=400, detail="Mobile Number must be 10 digits")
+
+    if not vehicle_model:
+        raise HTTPException(status_code=400, detail="Vehicle / Model is required")
+
+    if not ppf_package:
+        raise HTTPException(status_code=400, detail="PPF Package / Film is required")
+
+    def parse_float(val, default=0.0):
+        if val is None or val == "":
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Costs and percentages must be valid numbers")
+
+    basic_cost = parse_float(data.basic_cost if data.basic_cost is not None else data.basicCost, 0.0)
+    installer_charges = parse_float(data.installer_charges if data.installer_charges is not None else data.installerCharges, 0.0)
+    detailing_charges = parse_float(data.detailing_charges if data.detailing_charges is not None else data.detailingCharges, 0.0)
+    margin_percentage = parse_float(data.margin_percentage if data.margin_percentage is not None else (data.marginPercentage if data.marginPercentage is not None else 30.0), 30.0)
+    gst_percentage = parse_float(data.gst_percentage if data.gst_percentage is not None else (data.gstPercentage if data.gstPercentage is not None else 18.0), 18.0)
+
+    if basic_cost < 0 or installer_charges < 0 or detailing_charges < 0:
+        raise HTTPException(status_code=400, detail="Cost values must be numbers >= 0")
+
+    if margin_percentage < 0 or gst_percentage < 0:
+        raise HTTPException(status_code=400, detail="Margin % and GST % must be >= 0")
+
+    # Generate quotation number with atomic counter (Ignore any client-sent number)
+    seq = await get_next_quotation_seq()
+    quotation_number = format_quotation_number(seq)
+
+    # Recalculate all totals on the backend
+    totals = calculate_quotation_totals(
+        basic_cost=basic_cost,
+        installer_charges=installer_charges,
+        detailing_charges=detailing_charges,
+        margin_percentage=margin_percentage,
+        gst_percentage=gst_percentage
+    )
+
+    doc_id = str(uuid.uuid4())
+    doc = {
+        "id": doc_id,
+        "quotation_number": quotation_number,
+        "quotation_no": quotation_number,
+        "quotationNo": quotation_number,
+        "sequence_number": seq,
+        "quotation_date": quotation_date,
+        "quotationDate": quotation_date,
+        "customer_name": customer_name,
+        "customerName": customer_name,
+        "mobile_number": cleaned_mobile,
+        "mobileNumber": cleaned_mobile,
+        "vehicle_model": vehicle_model,
+        "vehicleModel": vehicle_model,
+        "ppf_package": ppf_package,
+        "ppfPackage": ppf_package,
+        "basic_cost": basic_cost,
+        "basicCost": basic_cost,
+        "installer_charges": installer_charges,
+        "installerCharges": installer_charges,
+        "detailing_charges": detailing_charges,
+        "detailingCharges": detailing_charges,
+        "margin_percentage": margin_percentage,
+        "marginPercentage": margin_percentage,
+        "gst_percentage": gst_percentage,
+        "gstPercentage": gst_percentage,
+        "total_cost": totals["total_cost"],
+        "totalCost": totals["total_cost"],
+        "margin_amount": totals["margin_amount"],
+        "marginAmount": totals["margin_amount"],
+        "total_cost_incl_margin": totals["total_cost_incl_margin"],
+        "totalCostInclMargin": totals["total_cost_incl_margin"],
+        "gst_amount": totals["gst_amount"],
+        "gstAmount": totals["gst_amount"],
+        "final_quotation_value": totals["final_quotation_value"],
+        "finalQuotationValue": totals["final_quotation_value"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user["username"],
+        "created_by_name": current_user.get("name", "")
+    }
+
+    await db.quotations.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/quotations")
+async def list_quotations(current_user: dict = Depends(get_current_user)):
+    """List quotations newest first - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotations = await db.quotations.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return quotations
+
+@api_router.get("/quotations/{id}")
+async def get_quotation_by_id(id: str, current_user: dict = Depends(get_current_user)):
+    """Get single quotation by id or quotation number - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_number": id}, {"quotation_no": id}]},
+        {"_id": 0}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+    return quotation
+
+@api_router.delete("/quotations/{id}")
+async def delete_quotation(id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a saved PPF quotation - Owner and Superadmin only. Counter is NEVER decremented or reset."""
+    await require_role(["owner", "superadmin"], current_user)
+    result = await db.quotations.delete_one(
+        {"$or": [{"id": id}, {"quotation_number": id}, {"quotation_no": id}]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+    return {"message": "Quotation deleted successfully", "id": id}
+
+@api_router.get("/system/db-info")
+async def get_db_info():
+    """Return database name and test status for test suite safety verification only when IS_TESTING == 'true'"""
+    if os.environ.get("IS_TESTING") != "true":
+        raise HTTPException(status_code=404, detail="Not found")
+    current_db = os.environ.get("DB_NAME", "").strip('"\'')
+    return {
+        "db_name": current_db,
+        "is_test_db": current_db.endswith("_test")
+    }
+
 # ============== SEED DEFAULT OWNER ==============
 
 @app.on_event("startup")
@@ -1051,3 +1365,5 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    for c in _test_clients.values():
+        c.close()
