@@ -12,6 +12,8 @@ import Booking from "./pages/Booking";
 import Knowledge from "./pages/Knowledge";
 import Contact from "./pages/Contact";
 import TokenDisplay from "./pages/TokenDisplay";
+import PublicCustomerQuotation from "./pages/PublicCustomerQuotation";
+import AdminCustomerQuotations from "./pages/AdminCustomerQuotations";
 
 // Admin Pages
 import AdminLogin from "./pages/AdminLogin";
@@ -126,6 +128,14 @@ const AdminRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/customer-quotations" 
+        element={
+          <ProtectedRoute>
+            <AdminCustomerQuotations />
+          </ProtectedRoute>
+        } 
+      />
       {/* Installer Payment Routes */}
       <Route 
         path="/installer" 
@@ -204,6 +214,7 @@ function App() {
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/token-display" element={<TokenDisplay />} />
+            <Route path="/q2/:token" element={<PublicCustomerQuotation />} />
             
             {/* Admin Routes */}
             <Route path="/admin/*" element={<AdminRoutes />} />

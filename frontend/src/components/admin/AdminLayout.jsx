@@ -4,7 +4,7 @@ import {
   Car, LogOut, Plus, List, BarChart3, Menu, X, 
   Home, ChevronRight, Bell, Wallet, Users, Settings, CalendarCheck,
   Crown, Shield, UserCog, ClipboardCheck, UserPlus, Star, CalendarDays,
-  FileSpreadsheet
+  FileSpreadsheet, FileText
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -77,6 +77,7 @@ const AdminLayout = ({ children, title }) => {
     { path: '/admin/bookings', label: 'Customer Bookings', icon: CalendarCheck },
     { path: '/admin/slots', label: 'Booking Slots', icon: CalendarDays },
     { path: '/admin/quotations', label: 'PPF Quotation', icon: FileSpreadsheet },
+    { path: '/admin/customer-quotations', label: 'Customer Quotation', icon: FileText },
     { path: '/admin/new-entry', label: 'New Entry', icon: Plus },
     { path: '/admin/entries', label: 'All Entries', icon: List },
     { path: '/admin/reports', label: 'Reports', icon: BarChart3 },

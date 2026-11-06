@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -7,9 +7,12 @@ import os
 import asyncio
 import re
 import logging
+import secrets
+import time
+from collections import defaultdict
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
@@ -169,6 +172,43 @@ class BookingCreate(BaseModel):
 class BookingStatusUpdate(BaseModel):
     status: str
 
+class CustomerServiceItem(BaseModel):
+    key: str
+    label: Optional[str] = ""
+    selected: bool = False
+    amount: float = 0.0
+    detail: Optional[str] = None
+
+class ShareLinkToggleRequest(BaseModel):
+    disabled: Optional[bool] = None
+
+class CustomerQuotationCreate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    quotation_no: Optional[str] = None
+    quotation_date: Optional[str] = None
+    customer_name: str
+    mobile: str
+    vehicle_model: str
+    ppf_package: Optional[str] = None
+    ppf_price: Optional[float] = None
+    services: Optional[List[CustomerServiceItem]] = []
+    discount: Optional[float] = 0.0
+
+class CustomerQuotationUpdate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    customer_name: Optional[str] = None
+    quotation_date: Optional[str] = None
+    mobile: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    ppf_package: Optional[str] = None
+    ppf_price: Optional[float] = None
+    services: Optional[List[CustomerServiceItem]] = None
+    discount: Optional[float] = None
+
+class CustomerQuotationRespond(BaseModel):
+    decision: str
+    reason: Optional[str] = None
+
 class QuotationCreate(BaseModel):
     model_config = ConfigDict(extra="allow")
     quotation_no: Optional[str] = None
@@ -214,6 +254,116 @@ def calculate_quotation_totals(
         "total_cost_incl_margin": total_cost_incl_margin,
         "gst_amount": gst_amount,
         "final_quotation_value": final_quotation_value
+    }
+
+def mask_mobile_number(mobile: str) -> str:
+    cleaned = re.sub(r"\D", "", mobile or "")
+    if len(cleaned) < 5:
+        return "XXXXX"
+    masked_middle = "X" * (len(cleaned) - 5)
+    return f"{cleaned[:2]}{masked_middle}{cleaned[-3:]}"
+
+def calculate_valid_until(quotation_date_str: str) -> str:
+    valid_days = int(os.environ.get("QUOTATION_VALID_DAYS", 15))
+    try:
+        q_date = datetime.strptime(quotation_date_str, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        try:
+            q_date = datetime.fromisoformat(quotation_date_str.replace("Z", "+00:00"))
+        except Exception:
+            q_date = datetime.now()
+    valid_until = q_date + timedelta(days=valid_days)
+    return valid_until.strftime("%Y-%m-%d")
+
+def get_client_ip(request: Request) -> str:
+    """Extract first IP from X-Forwarded-For (Render proxy) or fall back to client host"""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+_customer_public_rate_limit_records = defaultdict(list)
+
+def check_customer_public_rate_limit(client_ip: str, limit: int = 30, window_seconds: int = 60) -> bool:
+    now = time.time()
+    records = _customer_public_rate_limit_records[client_ip]
+    valid_records = [t for t in records if now - t < window_seconds]
+    _customer_public_rate_limit_records[client_ip] = valid_records
+    if len(valid_records) >= limit:
+        return False
+    _customer_public_rate_limit_records[client_ip].append(now)
+    return True
+
+def format_customer_quotation_number(seq: int) -> str:
+    return f"WSCQ-{seq:03d}"
+
+async def get_next_customer_quotation_seq() -> int:
+    counter = await db.counters.find_one_and_update(
+        {"_id": "customer_quotation_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    return counter["seq"]
+
+async def peek_next_customer_quotation_seq() -> int:
+    counter = await db.counters.find_one({"_id": "customer_quotation_number"})
+    current_seq = counter.get("seq", 0) if counter else 0
+    return current_seq + 1
+
+STANDARD_CUSTOMER_SERVICE_KEYS = [
+    {"key": "paint_protection_film", "label": "Paint Protection Film (PPF)"},
+    {"key": "window_filming", "label": "Window Filming"},
+    {"key": "ceramic_coating", "label": "Ceramic Coating"},
+    {"key": "graphene_coating", "label": "Graphene Coating"},
+    {"key": "interior_ppf", "label": "Interior PPF"},
+    {"key": "sunroof_ppf", "label": "Sunroof PPF"}
+]
+
+def calculate_customer_quotation_totals(
+    services_or_ppf=None,
+    services=None,
+    discount: float = 0.0,
+    ppf_price: float = 0.0,
+    gst_rate: float = 18.0,
+    **kwargs
+) -> dict:
+    actual_services = []
+    actual_ppf_price = float(ppf_price or 0.0)
+    actual_discount = float(discount or 0.0)
+    actual_gst_rate = float(gst_rate or 18.0)
+
+    if isinstance(services_or_ppf, list):
+        actual_services = services_or_ppf
+    elif isinstance(services_or_ppf, (int, float)):
+        actual_ppf_price = float(services_or_ppf)
+        if services is not None:
+            actual_services = services
+    elif services is not None:
+        actual_services = services
+
+    if "discount" in kwargs:
+        actual_discount = float(kwargs["discount"] or 0.0)
+    if "ppf_price" in kwargs:
+        actual_ppf_price = float(kwargs["ppf_price"] or 0.0)
+    if "gst_rate" in kwargs:
+        actual_gst_rate = float(kwargs["gst_rate"] or 18.0)
+
+    selected_services_sum = sum(
+        float(s.get("amount", 0.0) or 0.0)
+        for s in actual_services
+        if (isinstance(s, dict) and s.get("selected"))
+    )
+    raw_subtotal = actual_ppf_price + selected_services_sum - actual_discount
+    subtotal = round(max(0.0, raw_subtotal), 2)
+    gst_amount = round(subtotal * (actual_gst_rate / 100.0), 2)
+    final_price = round(subtotal + gst_amount, 2)
+    return {
+        "subtotal": subtotal,
+        "gst_amount": gst_amount,
+        "final_price": final_price
     }
 
 def format_quotation_number(seq: int) -> str:
@@ -1319,6 +1469,488 @@ async def delete_quotation(id: str, current_user: dict = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Quotation not found")
     return {"message": "Quotation deleted successfully", "id": id}
+
+# ============== CUSTOMER QUOTATIONS (WSCQ) ==============
+
+def _sanitize_customer_services(raw_services: Optional[List[Any]]) -> List[dict]:
+    service_map = {}
+    if raw_services:
+        for s in raw_services:
+            if isinstance(s, dict):
+                k = s.get("key")
+                service_map[k] = s
+            elif hasattr(s, "model_dump"):
+                d = s.model_dump()
+                service_map[d.get("key")] = d
+            elif hasattr(s, "dict"):
+                d = s.dict()
+                service_map[d.get("key")] = d
+
+    result = []
+    for std in STANDARD_CUSTOMER_SERVICE_KEYS:
+        k = std["key"]
+        found = service_map.get(k, {})
+        raw_detail = found.get("detail")
+        detail = str(raw_detail).strip()[:100] if raw_detail is not None and str(raw_detail).strip() else None
+        result.append({
+            "key": k,
+            "label": std["label"],
+            "selected": bool(found.get("selected", False)),
+            "amount": max(0.0, float(found.get("amount", 0.0) or 0.0)),
+            "detail": detail
+        })
+    return result
+
+@api_router.get("/customer-quotations/next-number")
+async def get_next_customer_quotation_number(current_user: dict = Depends(get_current_user)):
+    """Get the preview next customer quotation number without advancing counter - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    next_seq = await peek_next_customer_quotation_seq()
+    return {"next_quotation_number": format_customer_quotation_number(next_seq)}
+
+@api_router.post("/customer-quotations")
+async def create_customer_quotation(data: CustomerQuotationCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new customer quotation with auto WSCQ sequence number - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+
+    customer_name = (data.customer_name or "").strip()
+    if not customer_name:
+        raise HTTPException(status_code=400, detail="Customer Name is required")
+
+    cleaned_mobile = re.sub(r"\D", "", data.mobile or "")
+    if len(cleaned_mobile) != 10:
+        raise HTTPException(status_code=400, detail="Mobile Number must be 10 digits")
+
+    vehicle_model = (data.vehicle_model or "").strip()
+    if not vehicle_model:
+        raise HTTPException(status_code=400, detail="Vehicle / Model is required")
+
+    quotation_date = (data.quotation_date or datetime.now().strftime("%Y-%m-%d")).strip()
+    ppf_package = (data.ppf_package or "").strip() if data.ppf_package else ""
+    ppf_price = max(0.0, float(data.ppf_price or 0.0))
+    discount = max(0.0, float(data.discount or 0.0))
+    services_list = _sanitize_customer_services(data.services)
+
+    # Validate: Require at least one selected service with amount > 0 (or legacy ppf_price > 0)
+    has_valid_service = any(
+        s.get("selected") and float(s.get("amount", 0.0) or 0.0) > 0
+        for s in services_list
+    )
+    if not has_valid_service and ppf_price <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one service with an amount greater than 0 must be selected"
+        )
+
+    # Recompute all totals on the backend
+    totals = calculate_customer_quotation_totals(
+        services=services_list,
+        discount=discount,
+        ppf_price=ppf_price,
+        gst_rate=18.0
+    )
+
+    # Generate atomic sequence number
+    seq = await get_next_customer_quotation_seq()
+    quotation_no = format_customer_quotation_number(seq)
+    share_token = secrets.token_urlsafe(24)
+    doc_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    doc = {
+        "id": doc_id,
+        "quotation_no": quotation_no,
+        "sequence_number": seq,
+        "quotation_date": quotation_date,
+        "customer_name": customer_name,
+        "mobile": cleaned_mobile,
+        "vehicle_model": vehicle_model,
+        "ppf_package": ppf_package,
+        "ppf_price": ppf_price,
+        "gst_rate": 18.0,
+        "services": services_list,
+        "discount": discount,
+        "subtotal": totals["subtotal"],
+        "gst_amount": totals["gst_amount"],
+        "final_price": totals["final_price"],
+        "status": "pending",
+        "status_updated_at": None,
+        "customer_reject_reason": None,
+        "share_token": share_token,
+        "link_disabled": False,
+        "created_at": now_iso,
+        "updated_at": None,
+        "created_by": current_user["username"],
+        "created_by_name": current_user.get("name", "")
+    }
+
+    await db.customer_quotations.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/customer-quotations")
+async def list_customer_quotations(current_user: dict = Depends(get_current_user)):
+    """List customer quotations newest first - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotations = await db.customer_quotations.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return quotations
+
+@api_router.get("/customer-quotations/{id}")
+async def get_customer_quotation_by_id(id: str, current_user: dict = Depends(get_current_user)):
+    """Get single customer quotation by id or quotation_no - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.customer_quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]},
+        {"_id": 0}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+    return quotation
+
+@api_router.put("/customer-quotations/{id}")
+@api_router.patch("/customer-quotations/{id}")
+async def update_customer_quotation(id: str, data: CustomerQuotationUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a customer quotation - ONLY allowed while status is pending - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.customer_quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+
+    if quotation.get("status") != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quotation cannot be updated because its status is '{quotation.get('status')}'. Please create a revised quotation."
+        )
+
+    # Extract or keep existing values
+    customer_name = (data.customer_name if data.customer_name is not None else quotation.get("customer_name", "")).strip()
+    if not customer_name:
+        raise HTTPException(status_code=400, detail="Customer Name is required")
+
+    if data.mobile is not None:
+        cleaned_mobile = re.sub(r"\D", "", data.mobile)
+        if len(cleaned_mobile) != 10:
+            raise HTTPException(status_code=400, detail="Mobile Number must be 10 digits")
+    else:
+        cleaned_mobile = quotation.get("mobile", "")
+
+    vehicle_model = (data.vehicle_model if data.vehicle_model is not None else quotation.get("vehicle_model", "")).strip()
+    if not vehicle_model:
+        raise HTTPException(status_code=400, detail="Vehicle / Model is required")
+
+    quotation_date = (data.quotation_date if data.quotation_date is not None else quotation.get("quotation_date", "")).strip()
+    ppf_package = (data.ppf_package if data.ppf_package is not None else quotation.get("ppf_package", "")).strip()
+    ppf_price = max(0.0, float(data.ppf_price if data.ppf_price is not None else quotation.get("ppf_price", 0.0) or 0.0))
+    discount = max(0.0, float(data.discount if data.discount is not None else quotation.get("discount", 0.0) or 0.0))
+
+    if data.services is not None:
+        services_list = _sanitize_customer_services(data.services)
+    else:
+        services_list = quotation.get("services", [])
+
+    # Validate: Require at least one selected service with amount > 0 (or legacy ppf_price > 0)
+    has_valid_service = any(
+        s.get("selected") and float(s.get("amount", 0.0) or 0.0) > 0
+        for s in services_list
+    )
+    if not has_valid_service and ppf_price <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one service with an amount greater than 0 must be selected"
+        )
+
+    # Recompute totals on backend
+    totals = calculate_customer_quotation_totals(
+        services=services_list,
+        discount=discount,
+        ppf_price=ppf_price,
+        gst_rate=18.0
+    )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data = {
+        "customer_name": customer_name,
+        "mobile": cleaned_mobile,
+        "vehicle_model": vehicle_model,
+        "quotation_date": quotation_date,
+        "ppf_package": ppf_package,
+        "ppf_price": ppf_price,
+        "services": services_list,
+        "discount": discount,
+        "subtotal": totals["subtotal"],
+        "gst_amount": totals["gst_amount"],
+        "final_price": totals["final_price"],
+        "updated_at": now_iso
+    }
+
+    await db.customer_quotations.update_one(
+        {"_id": quotation["_id"]},
+        {"$set": update_data}
+    )
+
+    updated_doc = await db.customer_quotations.find_one({"_id": quotation["_id"]}, {"_id": 0})
+    return updated_doc
+
+@api_router.delete("/customer-quotations/{id}")
+async def delete_customer_quotation(id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a customer quotation - Owner and Superadmin only"""
+    await require_role(["owner", "superadmin"], current_user)
+    result = await db.customer_quotations.delete_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+    return {"message": "Customer quotation deleted successfully", "id": id}
+
+@api_router.get("/customer-quotations/{id}/share-link")
+async def get_customer_quotation_share_link(id: str, current_user: dict = Depends(get_current_user)):
+    """Get shareable link for customer quotation (/q2/{token}) - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.customer_quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+
+    token = quotation.get("share_token")
+    if not token:
+        token = secrets.token_urlsafe(24)
+        await db.customer_quotations.update_one(
+            {"_id": quotation["_id"]},
+            {"$set": {"share_token": token, "link_disabled": quotation.get("link_disabled", False)}}
+        )
+
+    link_disabled = bool(quotation.get("link_disabled", False))
+    return {
+        "share_token": token,
+        "relative_path": f"/q2/{token}",
+        "link_disabled": link_disabled
+    }
+
+@api_router.post("/customer-quotations/{id}/share-link/regenerate")
+async def regenerate_customer_quotation_share_link(id: str, current_user: dict = Depends(get_current_user)):
+    """Regenerate shareable token, invalidating old link - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.customer_quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+
+    new_token = secrets.token_urlsafe(24)
+    await db.customer_quotations.update_one(
+        {"_id": quotation["_id"]},
+        {"$set": {"share_token": new_token}}
+    )
+
+    link_disabled = bool(quotation.get("link_disabled", False))
+    return {
+        "share_token": new_token,
+        "relative_path": f"/q2/{new_token}",
+        "link_disabled": link_disabled,
+        "message": "Share link regenerated successfully"
+    }
+
+@api_router.post("/customer-quotations/{id}/share-link/toggle")
+@api_router.patch("/customer-quotations/{id}/share-link/toggle")
+async def toggle_customer_quotation_share_link(
+    id: str,
+    payload: Optional[ShareLinkToggleRequest] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Toggle or set disabled state of the customer quotation share link - Owner, Superadmin, Admin"""
+    await require_role(["owner", "superadmin", "admin"], current_user)
+    quotation = await db.customer_quotations.find_one(
+        {"$or": [{"id": id}, {"quotation_no": id}]}
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Customer quotation not found")
+
+    token = quotation.get("share_token")
+    if not token:
+        token = secrets.token_urlsafe(24)
+
+    current_disabled = bool(quotation.get("link_disabled", False))
+    if payload is not None and payload.disabled is not None:
+        new_disabled = bool(payload.disabled)
+    else:
+        new_disabled = not current_disabled
+
+    await db.customer_quotations.update_one(
+        {"_id": quotation["_id"]},
+        {"$set": {"link_disabled": new_disabled, "share_token": token}}
+    )
+
+    status_str = "disabled" if new_disabled else "enabled"
+    return {
+        "share_token": token,
+        "relative_path": f"/q2/{token}",
+        "link_disabled": new_disabled,
+        "message": f"Share link {status_str} successfully"
+    }
+
+@api_router.get("/public/customer-quotations/{token}")
+async def get_public_customer_quotation(token: str, request: Request):
+    """Customer-facing public view for customer quotation - no auth required"""
+    client_ip = get_client_ip(request)
+
+    if not check_customer_public_rate_limit(client_ip, limit=30, window_seconds=60):
+        logger.warning(f"Public customer quotation rate limit exceeded for IP: {client_ip}")
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+
+    quotation = await db.customer_quotations.find_one({"share_token": token})
+    if not quotation or quotation.get("link_disabled") is True:
+        logger.warning(
+            f"Public customer quotation lookup 404 for token: {token} "
+            f"(disabled: {quotation.get('link_disabled') if quotation else 'not found'}) from IP: {client_ip}"
+        )
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    quotation_no = quotation.get("quotation_no", "")
+    quotation_date = quotation.get("quotation_date", "")
+    valid_until = calculate_valid_until(quotation_date)
+    customer_name = quotation.get("customer_name", "")
+    masked_mobile = mask_mobile_number(quotation.get("mobile", ""))
+    vehicle_model = quotation.get("vehicle_model", "")
+    ppf_package = quotation.get("ppf_package", "")
+    ppf_price = float(quotation.get("ppf_price", 0.0) or 0.0)
+    
+    # Return selected services with label, amount, detail only (and key for consistency)
+    # Backward compatibility: if legacy ppf_price > 0, prepend it as "Paint Protection Film"
+    selected_services = []
+    if ppf_price > 0:
+        selected_services.append({
+            "key": "paint_protection_film",
+            "label": "Paint Protection Film",
+            "amount": ppf_price,
+            "detail": ppf_package or None
+        })
+
+    for s in quotation.get("services", []):
+        if s.get("selected") and float(s.get("amount", 0.0) or 0.0) > 0:
+            if s.get("key") == "paint_protection_film" and ppf_price > 0:
+                continue
+            selected_services.append({
+                "key": s.get("key"),
+                "label": s.get("label"),
+                "amount": float(s.get("amount", 0.0) or 0.0),
+                "detail": s.get("detail") or None
+            })
+
+    discount = float(quotation.get("discount", 0.0) or 0.0)
+    subtotal = float(quotation.get("subtotal", 0.0) or 0.0)
+    gst_rate = float(quotation.get("gst_rate", 18.0) or 18.0)
+    gst_amount = float(quotation.get("gst_amount", 0.0) or 0.0)
+    final_price = float(quotation.get("final_price", 0.0) or 0.0)
+    status = quotation.get("status", "pending")
+    status_updated_at = quotation.get("status_updated_at")
+    customer_reject_reason = quotation.get("customer_reject_reason")
+    last_updated = quotation.get("updated_at")
+
+    # Strict whitelist - absolutely no internal fields or _id
+    return {
+        "quotation_no": quotation_no,
+        "date": quotation_date,
+        "quotation_date": quotation_date,
+        "valid_until": valid_until,
+        "customer_name": customer_name,
+        "mobile": masked_mobile,
+        "vehicle_model": vehicle_model,
+        "ppf_package": ppf_package,
+        "ppf_price": ppf_price,
+        "services": selected_services,
+        "discount": discount,
+        "subtotal": subtotal,
+        "gst_rate": gst_rate,
+        "gst_amount": gst_amount,
+        "final_price": final_price,
+        "status": status,
+        "status_updated_at": status_updated_at,
+        "customer_reject_reason": customer_reject_reason,
+        "last_updated": last_updated
+    }
+
+@api_router.post("/public/customer-quotations/{token}/respond")
+async def respond_to_public_customer_quotation(
+    token: str,
+    payload: CustomerQuotationRespond,
+    request: Request
+):
+    """Customer decision (approved/rejected) on customer quotation - atomic and single-response only"""
+    client_ip = get_client_ip(request)
+
+    if not check_customer_public_rate_limit(client_ip, limit=30, window_seconds=60):
+        logger.warning(f"Public respond rate limit exceeded for IP: {client_ip}")
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+
+    quotation = await db.customer_quotations.find_one({"share_token": token})
+    if not quotation or quotation.get("link_disabled") is True:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    decision = (payload.decision or "").lower().strip()
+    if decision not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Decision must be 'approved' or 'rejected'")
+
+    reason = (payload.reason or "").strip()
+    if len(reason) > 300:
+        raise HTTPException(status_code=400, detail="Reason cannot exceed 300 characters")
+
+    # Check expiration
+    valid_until_str = calculate_valid_until(quotation.get("quotation_date", ""))
+    is_expired = False
+    try:
+        valid_until_date = datetime.strptime(valid_until_str, "%Y-%m-%d").date()
+        is_expired = datetime.now(timezone.utc).date() > valid_until_date
+    except Exception:
+        pass
+
+    if is_expired and decision == "approved":
+        raise HTTPException(
+            status_code=410,
+            detail="This quotation has expired and can no longer be approved. Please contact Wheelspa for a revised quotation."
+        )
+
+    # If already decided, return 409
+    current_status = quotation.get("status", "pending")
+    if current_status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quotation has already been {current_status}"
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_set = {
+        "status": decision,
+        "status_updated_at": now_iso
+    }
+    if decision == "rejected":
+        update_set["customer_reject_reason"] = reason if reason else None
+    else:
+        update_set["customer_reject_reason"] = None
+
+    # Atomic update with status == "pending" filter
+    result = await db.customer_quotations.update_one(
+        {"share_token": token, "status": "pending"},
+        {"$set": update_set}
+    )
+
+    if result.modified_count == 0:
+        fresh = await db.customer_quotations.find_one({"share_token": token})
+        fresh_status = fresh.get("status") if fresh else "decided"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quotation has already been {fresh_status}"
+        )
+
+    return {
+        "quotation_no": quotation.get("quotation_no"),
+        "status": decision,
+        "status_updated_at": now_iso,
+        "customer_reject_reason": reason if decision == "rejected" else None,
+        "message": f"Quotation has been {decision} successfully"
+    }
 
 @api_router.get("/system/db-info")
 async def get_db_info():
